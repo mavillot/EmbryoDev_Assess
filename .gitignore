@@ -1,0 +1,9 @@
+# Modelos entrenados
+models/
+assessment/ploidIA/
+assessment/vIAbility/
+logs/
+markers/
+Notebooks/
+tmp/
+output/
