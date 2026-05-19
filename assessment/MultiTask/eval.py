@@ -12,7 +12,6 @@ import torch.nn as nn
 from typing import Dict, List, Tuple, Optional
 
 from models.multi_task import MultiTaskModel
-from models.encoder.visual_encoder import ResNetEncoder, EfficientNetB3Encoder
 from models.temporal.temporal_transformer import VideoTransformer
 from data.dataset import MultiTaskDataset, multitask_collate, MultiTaskBatchSampler
 from data.managment import prepare_datasets
@@ -37,10 +36,14 @@ class MetricsTracker:
         self.exp_preds = []
         self.icm_labels = []
         self.icm_preds = []
+        self.stage_labels = []
+        self.stage_preds = []
         self.te_labels = []
         self.te_preds = []
         self.ploidy_labels = []
         self.ploidy_preds = []
+        self.fhb_labels = []
+        self.fhb_preds = []
         
         # Segmentation metrics
         self.frag_iou = []
@@ -194,6 +197,12 @@ class MetricsTracker:
             self.te_labels.extend(batch['te'].cpu().tolist())
             self.te_preds.extend(pred.cpu().tolist())
         
+        # STAGE classification
+        if batch.get('stage') is not None and 'stage' in outputs:
+            pred = outputs['stage'].argmax(dim=1)
+            self.stage_labels.extend(batch['stage'].cpu().tolist())
+            self.stage_preds.extend(pred.cpu().tolist())
+        
         # Ploidy classification
         if batch.get('ploidy') is not None and 'ploidy' in outputs:
             logits = outputs['ploidy']
@@ -201,6 +210,13 @@ class MetricsTracker:
             preds = (probs > 0.5).long().view(-1)
             self.ploidy_labels.extend(batch['ploidy'].cpu().tolist())
             self.ploidy_preds.extend(preds.cpu().tolist())
+        
+        if batch.get('fhb') is not None and 'fhb' in outputs:
+            logits = outputs['fhb']
+            probs = torch.sigmoid(logits)
+            preds = (probs > 0.5).long().view(-1)
+            self.fhb_labels.extend(batch['fhb'].cpu().tolist())
+            self.fhb_preds.extend(preds.cpu().tolist())
     
     def update_segmentation(
         self,
@@ -323,6 +339,15 @@ class MetricsTracker:
             summary['te_metrics']['specificity'] = te_metrics['macro_avg']['specificity']
             summary['te_metrics']['f1_score'] = te_metrics['macro_avg']['f1_score']
         
+        if self.stage_labels:
+            summary['stage_metrics'] = {}
+            summary['stage_metrics']['accuracy'] = accuracy_score(self.stage_labels, self.stage_preds)
+            stage_metrics = compute_metrics(self.stage_labels, self.stage_preds, num_classes=5)
+            summary['stage_metrics']['precision'] = stage_metrics['macro_avg']['precision']
+            summary['stage_metrics']['recall'] = stage_metrics['macro_avg']['recall']
+            summary['stage_metrics']['specificity'] = stage_metrics['macro_avg']['specificity']
+            summary['stage_metrics']['f1_score'] = stage_metrics['macro_avg']['f1_score']
+        
         if self.ploidy_labels:
             summary['ploidy_metrics'] = {}
             summary['ploidy_metrics']['accuracy'] = accuracy_score(self.ploidy_labels, self.ploidy_preds)
@@ -331,6 +356,15 @@ class MetricsTracker:
             summary['ploidy_metrics']['recall'] = ploidy_metrics['macro_avg']['recall']
             summary['ploidy_metrics']['specificity'] = ploidy_metrics['macro_avg']['specificity']
             summary['ploidy_metrics']['f1_score'] = ploidy_metrics['macro_avg']['f1_score']
+        
+        if self.fhb_labels:
+            summary['fhb_metrics'] = {}
+            summary['fhb_metrics']['accuracy'] = accuracy_score(self.fhb_labels, self.fhb_preds)
+            fhb_metrics = compute_metrics(self.fhb_labels, self.fhb_preds, num_classes=1)
+            summary['fhb_metrics']['precision'] = fhb_metrics['macro_avg']['precision']
+            summary['fhb_metrics']['recall'] = fhb_metrics['macro_avg']['recall']
+            summary['fhb_metrics']['specificity'] = fhb_metrics['macro_avg']['specificity']
+            summary['fhb_metrics']['f1_score'] = fhb_metrics['macro_avg']['f1_score']
         
         # Segmentation summaries
         if self.frag_dice:
@@ -400,7 +434,6 @@ class MultiTaskEvaluator:
     
     def _load_model(self):
         """Load model from checkpoint."""
-        # Load checkpoint
         checkpoint = torch.load(self.checkpoint_path, map_location=self.device)
         
         # Handle DataParallel checkpoint (remove 'module.' prefix)
@@ -411,7 +444,15 @@ class MultiTaskEvaluator:
                 new_state_dict[name] = v
             checkpoint = new_state_dict
         
-        self.base_model.load_state_dict(checkpoint)
+        # Use strict=False so that loss-function buffers saved during training
+        # (e.g. fragmentation_loss_fn.pos_weight, blasto_str_loss_fn params)
+        # do not cause a crash when the eval model is built without weighted_loss=True.
+        # Those buffers are only needed during training; we log them as a heads-up.
+        result = self.base_model.load_state_dict(checkpoint, strict=False)
+        if result.unexpected_keys:
+            print(f"  [checkpoint] Ignored training-only keys: {result.unexpected_keys}")
+        if result.missing_keys:
+            print(f"  [checkpoint] WARNING — missing keys (architecture mismatch?): {result.missing_keys}")
         self.base_model.to(self.device)
         
         # Wrap with DataParallel if using multi-GPU
@@ -477,9 +518,11 @@ class MultiTaskEvaluator:
             exp_labels=None,
             icm_labels=None,
             te_labels=None,
+            stage_labels=None,
             blasto_str_labels=None,
             fragmentation_labels=None,
-            ploidy_labels=None
+            ploidy_labels=None,
+            fhb_labels=None
         )
         
         return outputs
@@ -644,6 +687,42 @@ class MultiTaskEvaluator:
                     f.write(f"F1 Score:    {100*macro['f1_score']:.2f}\n")
                 f.write("\n\n")
             
+            # STAGE Classification
+            if self.metrics.stage_labels:
+                f.write("="*60 + "\n")
+                f.write("STAGE CLASSIFICATION\n")
+                f.write("="*60 + "\n")
+                
+                labels = sorted(list(set(self.metrics.stage_labels)))
+                cm = confusion_matrix(self.metrics.stage_labels, self.metrics.stage_preds, labels=labels)
+                self.save_confusion_matrix(
+                    cm,
+                    self.output_dir / 'confusion_matrix_STAGE.png',
+                    title='STAGE Confusion Matrix',
+                    labels=[f'Class {i}' for i in labels]
+                )
+                
+                report = classification_report(
+                    self.metrics.stage_labels,
+                    self.metrics.stage_preds,
+                    labels=labels,
+                    digits=4,
+                    zero_division=0
+                )
+                # f.write(report)
+                # f.write("\n")
+                
+                # Add per-class precision, recall, specificity
+                summary = self.metrics.get_summary()
+                if 'stage_metrics' in summary:                   
+                    macro = summary['stage_metrics']
+                    f.write(f"Accuracy :   {100*macro['accuracy']:.2f}\n")
+                    f.write(f"Precision:   {100*macro['precision']:.2f}\n")
+                    f.write(f"Recall:      {100*macro['recall']:.2f}\n")
+                    f.write(f"Specificity: {100*macro['specificity']:.2f}\n")
+                    f.write(f"F1 Score:    {100*macro['f1_score']:.2f}\n")
+                f.write("\n\n")
+            
             # Ploidy Classification
             if self.metrics.ploidy_labels:
                 f.write("="*60 + "\n")
@@ -685,6 +764,54 @@ class MultiTaskEvaluator:
                 if 'ploidy_metrics' in summary:
                     class_names = ['Aneuploid', 'Euploid']
                     macro = summary['ploidy_metrics']
+                    f.write(f"Accuracy :   {100*macro['accuracy']:.2f}\n")
+                    f.write(f"Precision:   {100*macro['precision']:.2f}\n")
+                    f.write(f"Recall:      {100*macro['recall']:.2f}\n")
+                    f.write(f"Specificity: {100*macro['specificity']:.2f}\n")
+                    f.write(f"F1 Score:    {100*macro['f1_score']:.2f}\n")
+                f.write("\n\n")
+
+            # fhb Classification
+            if self.metrics.fhb_labels:
+                f.write("="*60 + "\n")
+                f.write("FHB CLASSIFICATION\n")
+                f.write("="*60 + "\n")
+                
+                # Use numeric labels [0, 1] for sklearn functions
+                numeric_labels = [0, 1]
+                label_names = ['no_FHB', 'FHB']
+                
+                # Only compute confusion matrix if we have actual labels
+                unique_labels = sorted(list(set(self.metrics.fhb_labels)))
+                if unique_labels:
+                    cm = confusion_matrix(
+                        self.metrics.fhb_labels, 
+                        self.metrics.fhb_preds, 
+                        labels=numeric_labels
+                    )
+                    self.save_confusion_matrix(
+                        cm,
+                        self.output_dir / 'confusion_matrix_FHB.png',
+                        title='FHB Confusion Matrix',
+                        labels=label_names,
+                    )
+                
+                report = classification_report(
+                    self.metrics.fhb_labels,
+                    self.metrics.fhb_preds,
+                    labels=numeric_labels,
+                    target_names=label_names,
+                    digits=4,
+                    zero_division=0
+                )
+                # f.write(report)
+                # f.write("\n")
+                
+                # Add per-class precision, recall, specificity
+                summary = self.metrics.get_summary()
+                if 'fhb_metrics' in summary:
+                    class_names = ['no_FHB', 'FHB']
+                    macro = summary['fhb_metrics']
                     f.write(f"Accuracy :   {100*macro['accuracy']:.2f}\n")
                     f.write(f"Precision:   {100*macro['precision']:.2f}\n")
                     f.write(f"Recall:      {100*macro['recall']:.2f}\n")
@@ -751,8 +878,8 @@ def main(args):
     
     # Prepare dataset
     path = Path(args.path)
-    image_samples, video_samples = prepare_datasets(path, args.transformer, split="test", task=args.baseline)
-    test_dataset = MultiTaskDataset(image_samples=image_samples, video_samples=video_samples)
+    image_samples, video_samples = prepare_datasets(path, args.transformer, split="test", tasks=args.tasks)
+    test_dataset = MultiTaskDataset(image_samples=image_samples, video_samples=video_samples, img_size=(224, 224))
     
     print(f"Total test samples: {len(test_dataset)}\n")
     
@@ -766,21 +893,27 @@ def main(args):
     
     # Initialize model
     if args.encoder == "resnet34":
-        encoder = ResNetEncoder(pretrained=False)
+        from models.encoder.visual_encoder import ResNetEncoder
+        encoder = ResNetEncoder(pretrained=True)
     elif args.encoder == "efficientnet_b3":
-        encoder = EfficientNetB3Encoder(pretrained=False)
+        from models.encoder.visual_encoder import EfficientNetB3Encoder
+        encoder = EfficientNetB3Encoder(pretrained=True)
+    elif args.encoder == "femi":
+        from models.encoder.femi_encoder import FEMIEncoder
+        encoder = FEMIEncoder(freeze=False, embedding_dim=512)
     else:
         raise ValueError(f"Unknown encoder: {args.encoder}")
     
     # Conditionally initialize transformer
     if args.transformer:
-        transformer = VideoTransformer()
+        from models.temporal.temporal_transformer import VideoTransformer
+        transformer = VideoTransformer(args.frames) 
         print("Transformer enabled for video evaluation")
     else:
         transformer = None
         print("Transformer disabled - video samples will be skipped")
-    
-    model = MultiTaskModel(encoder, transformer, embedding_dim=512)
+
+    model = MultiTaskModel(encoder, transformer, embedding_dim=encoder.embedding_dim, weighted_loss=args.weighted_loss)
     
     # Initialize evaluator
     evaluator = MultiTaskEvaluator(
@@ -813,13 +946,13 @@ if __name__ == "__main__":
     )
     
     # Data paths
-    parser.add_argument("--path",type=str,required=True,help="Path to dataset directory", default=PATH_DATASET)
+    parser.add_argument("--path",type=str,required=False,help="Path to dataset directory", default=PATH_DATASET)
     parser.add_argument("--encoder", type=str, default="resnet34", help="Encoder architecture (default: resnet34)")
     parser.add_argument("--checkpoint",type=str,required=True,help="Path to model checkpoint")
-    parser.add_argument("--baseline", type=str, help="Use baseline model", default=None)
+    parser.add_argument("--tasks", type=str, help="Use baseline model", default=None)
     
     # Output
-    parser.add_argument("--output_dir",type=str,default=OUTPUT_PATH + "/assessment/MultiTask/evaluation/",help="Directory to save evaluation results")
+    parser.add_argument("--output_dir",type=str,default=OUTPUT_PATH + "/assessment/MultiTask/femi/",help="Directory to save evaluation results")
     
     # Processing parameters
     parser.add_argument("--batch_size",type=int,default=1,help="Batch size for evaluation")
@@ -830,5 +963,7 @@ if __name__ == "__main__":
     
     # Model settings
     parser.add_argument("--transformer",action="store_true",help="Enable transformer for video evaluation (required for video samples)")
+    parser.add_argument("--frames", type=int, default=50, help="Number of frames used during training (must match checkpoint)")
+    parser.add_argument("--weighted_loss", action="store_true", help="Build model with weighted loss heads (must match training checkpoint)")
     args = parser.parse_args()
     main(args)

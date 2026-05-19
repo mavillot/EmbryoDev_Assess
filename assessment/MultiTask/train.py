@@ -10,9 +10,7 @@ from collections import OrderedDict
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from models.multi_task import MultiTaskModel
-from models.encoder.visual_encoder import ResNetEncoder, EfficientNetB3Encoder
-from models.temporal.temporal_transformer import VideoTransformer
-from data.dataset import MultiTaskDataset, multitask_collate, MultiTaskBatchSampler
+from data.dataset import MultiTaskDataset, multitask_collate, MultiTaskBatchSampler, compute_sample_weights
 from data.managment import prepare_datasets
 from data.augmentation import get_train_transforms, get_val_transforms
 
@@ -26,7 +24,9 @@ WEIGHTS_LOSS = {
     'exp':           1.0,
     'icm':           1.0,
     'te':            1.0,
+    'stage':         1.0,
     'ploidy':        1.0,
+    'fhb':           1.0
 }
 
 class Trainer:
@@ -35,16 +35,19 @@ class Trainer:
     """
     
     def __init__(
-        self, 
-        model, 
-        dataset, 
+        self,
+        model,
+        dataset,
         val_dataset=None,
-        batch_size=2, 
-        lr=1e-3, 
+        batch_size=2,
+        lr=1e-3,
         device='cuda',
         multi_gpu=True,
         freeze_encoder=False,
-        best_model_path="best_model.pth"
+        best_model_path="best_model.pth",
+        oversample=False,
+        oversample_factor=1.5,
+        task_weights=None,
     ):
         self.base_model = model
         self.dataset = dataset
@@ -55,7 +58,10 @@ class Trainer:
         self.multi_gpu = multi_gpu and torch.cuda.device_count() > 1
         self.freeze_encoder = freeze_encoder
         self.best_model_path = best_model_path
-        self.history = {'train_loss': [],'val_loss': [],'task_losses': {}}
+        self.history           = {'train_loss': [], 'val_loss': [], 'task_losses': {}}
+        self.oversample        = oversample
+        self.oversample_factor = oversample_factor
+        self.task_weights      = task_weights
         
         # Setup model and optimizer
         self._setup_model()
@@ -91,25 +97,57 @@ class Trainer:
             self.optimizer, mode='min', factor=0.5, patience=3)      
         
     def _setup_dataloader(self):
-        """Setup dataloader with custom batch sampler."""
+        """Setup dataloader with custom batch sampler.
+        When self.oversample=True, computes inverse-frequency weights and passes
+        them to MultiTaskBatchSampler for minority-class oversampling.
+        Val loader always uses uniform sampling for unbiased metrics.
+        """
+        if self.oversample:
+            sample_weights = compute_sample_weights(
+                self.dataset, task_weights=self.task_weights
+            )
+            self._log_weight_summary(sample_weights)
+        else:
+            sample_weights = None
+
         self.dataloader = DataLoader(
-            self.dataset, 
-            batch_sampler=MultiTaskBatchSampler(self.dataset, self.batch_size),
-            collate_fn=multitask_collate
+            self.dataset,
+            batch_sampler=MultiTaskBatchSampler(
+                self.dataset, self.batch_size,
+                sample_weights=sample_weights,
+                oversample_factor=self.oversample_factor,
+            ),
+            collate_fn=multitask_collate,
         )
         if len(self.dataloader) == 0:
             raise ValueError(
                 "Dataloader has 0 batches. Check dataset size, batch_size, and dataset configuration."
             )
+        # Val loader always uniform — unbiased validation metrics
         if self.val_dataset is not None:
             self.val_dataloader = DataLoader(
                 self.val_dataset,
                 batch_sampler=MultiTaskBatchSampler(self.val_dataset, self.batch_size),
-                collate_fn=multitask_collate
+                collate_fn=multitask_collate,
             )
         else:
             self.val_dataloader = None
-    
+    def _log_weight_summary(self, sample_weights):
+        """Print per-task class weight statistics so imbalance correction is visible."""
+        from collections import defaultdict
+        buckets = defaultdict(list)
+        for idx, (_, sample) in enumerate(self.dataset.samples):
+            for field in ['icm', 'te', 'exp', 'stage', 'ploidy', 'fhb']:
+                val = sample.get(field)
+                if val is not None and not isinstance(val, list):
+                    buckets[f"{field}_cls{int(val)}"].append(sample_weights[idx])
+                    break
+        print("  Oversampling weight summary (mean weight per class):")
+        for key in sorted(buckets):
+            vals = buckets[key]
+            print(f"    {key:20s}: mean={sum(vals)/len(vals):.3f}  n={len(vals)}")
+
+
     def _move_batch_to_device(self, batch):
         """Move batch tensors to device."""
         images = batch.get('images', None)
@@ -117,14 +155,15 @@ class Trainer:
         
         if images is not None:
             batch['images'] = images.to(self.device)
-            for key in ['mask_str', 'mask_frag', 'exp', 'icm', 'te']:
+            for key in ['mask_str', 'mask_frag', 'exp', 'icm', 'te', 'stage']:
                 if batch.get(key) is not None:
                     batch[key] = batch[key].to(self.device)
         
         if videos is not None:
             batch['videos'] = videos.to(self.device)
-            if batch.get('ploidy') is not None:
-                batch['ploidy'] = batch['ploidy'].to(self.device)
+            for key in ['ploidy', 'fhb']:
+                if batch.get(key) is not None:
+                    batch[key] = batch[key].to(self.device)
                 
         return batch
     
@@ -138,7 +177,9 @@ class Trainer:
             exp_labels=batch.get('exp'),
             icm_labels=batch.get('icm'),
             te_labels=batch.get('te'),
-            ploidy_labels=batch.get('ploidy')
+            stage_labels=batch.get('stage'),
+            ploidy_labels=batch.get('ploidy'),
+            fhb_labels=batch.get('fhb')
         )
         
         # Sum all task losses
@@ -398,7 +439,7 @@ def main(args):
     # Setup
     """Main training script."""
     path = Path(PATH_DATASET)
-    image_samples, video_samples = prepare_datasets(path, args.transformer, 'train', args.baseline)
+    image_samples, video_samples = prepare_datasets(path, args.transformer, 'train', args.tasks, args.frames)
 
     val_ratio    = 0.15
     all_samples  = image_samples  # your list of dicts
@@ -414,14 +455,18 @@ def main(args):
     train_videos = video_samples[:vid_split]
     val_videos   = video_samples[vid_split:]
 
+    size =(224, 224)
+
     train_dataset = MultiTaskDataset(
         image_samples=train_images,
         video_samples=train_videos,
-        transform=get_train_transforms() if args.data_augmentation else None
+        img_size=size,
+        transform=get_train_transforms(size) if args.data_augmentation else None
     )
     val_dataset = MultiTaskDataset(
         image_samples=val_images,
         video_samples=val_videos,    
+        img_size=size,
         transform=get_val_transforms()
     )
 
@@ -430,18 +475,26 @@ def main(args):
 
     # Initialize model
     if args.encoder == "resnet34":
+        from models.encoder.visual_encoder import ResNetEncoder
         encoder = ResNetEncoder(pretrained=True)
     elif args.encoder == "efficientnet_b3":
+        from models.encoder.visual_encoder import EfficientNetB3Encoder
         encoder = EfficientNetB3Encoder(pretrained=True)
+    elif args.encoder == "femi":
+        from models.encoder.femi_encoder import FEMIEncoder
+        encoder = FEMIEncoder(freeze=False, embedding_dim=512)
     else:
         raise ValueError(f"Unknown encoder: {args.encoder}")
 
-    transformer = VideoTransformer() if args.transformer else None
+    if args.transformer:
+        from models.temporal.temporal_transformer import VideoTransformer
+        transformer = VideoTransformer(args.frames) 
+    else:
+        transformer = None
     model = MultiTaskModel(encoder, transformer, embedding_dim=encoder.embedding_dim, weighted_loss=args.weighted_loss)
 
-    model_path = Path(args.path_model) / args.encoder / ("transformer" if args.transformer else "no_transformer")
-    if args.baseline:
-        model_path = model_path / args.baseline
+    tasks_tag = "_".join(sorted(args.tasks)) if args.tasks else "all"
+    model_path = Path(args.path_model) / args.encoder / ("transformer" if args.transformer else "no_transformer") / tasks_tag
 
     if not model_path.exists():
         model_path.mkdir(parents=True, exist_ok=True)
@@ -453,40 +506,48 @@ def main(args):
     print("=" * 60)
     print("PHASE 1: Training with frozen encoder")
     print("=" * 60)
+    import json as _json
+    _task_weights = _json.loads(args.task_weights) if args.task_weights else None
+
     trainer = Trainer(
         model=model,
-        dataset=train_dataset,          
-        val_dataset=val_dataset,        
-        batch_size=args.batch_size,     
+        dataset=train_dataset,
+        val_dataset=val_dataset,
+        batch_size=args.batch_size,
         lr=1e-3,
-        device=args.device,             
-        multi_gpu=args.multi_gpu,       
+        device=args.device,
+        multi_gpu=False,
         freeze_encoder=True,
-        best_model_path=model_path / "best_model_phase1.pth"
+        best_model_path=model_path / "best_model_phase1.pth",
+        oversample=args.oversample,
+        oversample_factor=args.oversample_factor,
+        task_weights=_task_weights,
     )
-    best_loss_phase1 = trainer.train(epochs=10, patience=5)
+    best_loss_phase1 = trainer.train(epochs=20, patience=5)
     current_epoch += len(trainer.history['train_loss'])
     phase_boundary_epochs.append(current_epoch)
 
-    # --- Phase 2: Unfreeze last 2 encoder blocks ---
-    print("\n" + "=" * 60)
-    print("PHASE 2: Training last 2 encoder blocks")
-    print("=" * 60)
+    if args.phase2: 
+        # --- Phase 2: Unfreeze last 2 encoder blocks ---
+        print("\n" + "=" * 60)
+        print("PHASE 2: Training last 2 encoder blocks")
+        print("=" * 60)
 
-    trainer.best_model_path = model_path / "best_model_phase2.pth"   
-    trainer.unfreeze_encoder(layers=2, new_lr=1e-4)
-    best_loss_phase2 = trainer.train(epochs=10, patience=5)
-    current_epoch += len(trainer.history['train_loss']) - phase_boundary_epochs[-1]  
-    phase_boundary_epochs.append(current_epoch)
+        trainer.best_model_path = model_path / "best_model_phase2.pth"   
+        trainer.unfreeze_encoder(layers=1, new_lr=1e-4)
+        best_loss_phase2 = trainer.train(epochs=5, patience=5)
+        current_epoch += len(trainer.history['train_loss']) - phase_boundary_epochs[-1]  
+        phase_boundary_epochs.append(current_epoch)
 
-    # --- Phase 3: Unfreeze full encoder ---
-    print("\n" + "=" * 60)
-    print("PHASE 3: Unfreeze the full encoder")
-    print("=" * 60)
+    if args.phase3:
+        # --- Phase 3: Unfreeze full encoder ---
+        print("\n" + "=" * 60)
+        print("PHASE 3: Unfreeze the full encoder")
+        print("=" * 60)
 
-    trainer.best_model_path = model_path / "best_model_phase3.pth"   # FIXED: was PATH_MODELS
-    trainer.unfreeze_encoder(layers='all', new_lr=1e-5)
-    best_loss_phase3 = trainer.train(epochs=20, patience=7)
+        trainer.best_model_path = model_path / "best_model_phase3.pth"   # FIXED: was PATH_MODELS
+        trainer.unfreeze_encoder(layers=2, new_lr=1e-5)
+        best_loss_phase3 = trainer.train(epochs=5, patience=7)
 
     # Save and plot at the very end
     trainer.save_history(model_path / "loss_history.json")
@@ -499,20 +560,33 @@ def main(args):
     trainer.save_checkpoint(final_model_path)
     print(f"\nFinal model saved to {final_model_path}")
     print(f"Phase 1 best loss: {best_loss_phase1:.4f}")
-    print(f"Phase 2 best loss: {best_loss_phase2:.4f}")
-    print(f"Phase 3 best loss: {best_loss_phase3:.4f}")
+    if args.phase2:
+        print(f"Phase 2 best loss: {best_loss_phase2:.4f}")
+    if args.phase3:
+        print(f"Phase 3 best loss: {best_loss_phase3:.4f}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MultiTask Model Training")
     parser.add_argument("--encoder", type=str, default="resnet34", help="Encoder architecture (default: resnet34)")
-    parser.add_argument("--baseline", type=str, default=None, help="Use baseline model")
+    parser.add_argument("--tasks", nargs="+",default=None,help=(
+            "Tasks to include in training. Pass one or more of: "
+            "exp icm te seg frag stage ploidy fhb. "
+            "Omit to include all tasks (default behaviour)."
+        ),
+    )
     parser.add_argument("--transformer", action="store_true", help="Use transformer model")
+    parser.add_argument("--frames", type=int, default=50, help="Number of frames for video input (default: 50)")
     parser.add_argument("--device", type=str, default="cuda", help="Device to use: cuda or cpu (default: cuda)")
     parser.add_argument("--batch_size", type=int, default=4, help="Batch size (default: 4)")
     parser.add_argument("--multi_gpu", action="store_true", help="Use DataParallel multi-GPU training")
     parser.add_argument('--weighted_loss', action='store_true', help="use weight loss for classification")
     parser.add_argument('--data_augmentation', action= 'store_true', help='whether data augmentation is applied')
     parser.add_argument('--path_model', type = str, default= 'models/assessment/Multitask/')
+    parser.add_argument('--oversample', action='store_true', help='Oversample minority classes using inverse-frequency weights.')
+    parser.add_argument('--oversample_factor', type=float, default=1.5,help='Epoch size multiplier when oversampling (default 1.5).')
+    parser.add_argument('--task_weights',type=str, default=None,help='JSON dict of task multipliers, e.g. \'{"icm":2.0,"te":2.0}\'')
+    parser.add_argument('--phase2', action='store_true', help='Whether to run phase 2 (unfreeze last encoder block)')
+    parser.add_argument('--phase3', action='store_true', help='Whether to run phase 3 (unfreeze full encoder)')
     args = parser.parse_args()
     main(args)
