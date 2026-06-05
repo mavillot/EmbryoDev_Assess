@@ -1,0 +1,49 @@
+name: viability3d
+
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+
+dependencies:
+  # ── Python ────────────────────────────────────────────────────────────────
+  - python=3.10
+
+  # ── PyTorch (GPU — CUDA 11.8) ─────────────────────────────────────────────
+  # Change cudatoolkit to 12.1 if your driver supports CUDA 12.
+  # For CPU-only: replace the three lines below with `- cpuonly`
+  - pytorch=2.1
+  - torchvision=0.16          # has MViT_V2_S_Weights + r2plus1d_18
+  - pytorch-cuda=11.8
+
+  # ── Scientific stack ──────────────────────────────────────────────────────
+  - numpy>=1.24,<2.0
+  - scipy>=1.11
+  - pandas>=2.0
+  - openpyxl>=3.1             # pandas Excel reader (Oslo_completo.xlsx)
+
+  # ── Computer vision ───────────────────────────────────────────────────────
+  - opencv>=4.8               # cv2
+
+  # ── Plotting ──────────────────────────────────────────────────────────────
+  - matplotlib>=3.7
+  - seaborn>=0.13
+
+  # ── ML metrics ────────────────────────────────────────────────────────────
+  - scikit-learn>=1.3
+
+  # ── pip packages (not on conda) ───────────────────────────────────────────
+  # - pip
+  # - pip:
+  #     # TensorFlow + Keras 3 ---------------------------------------------------
+  #     # TF 2.16 ships Keras 3 by default; pin keras separately for clarity.
+  #     - tensorflow[and-cuda]==2.16.2     # GPU build (includes CUDA/cuDNN wheels)
+  #     # Use  tensorflow-cpu==2.16.2  instead for CPU-only machines
+  #     - keras==3.3.3
+
+  #     # Einops (used in resnet_3d.py) ------------------------------------------
+  #     - einops>=0.7
+
+  #     # Utilities --------------------------------------------------------------
+  #     - tqdm>=4.66

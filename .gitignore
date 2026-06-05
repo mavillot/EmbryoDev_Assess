@@ -1,9 +1,9 @@
 # Modelos entrenados
 models/
-assessment/ploidIA/
-assessment/vIAbility/
 logs/
-markers/
 Notebooks/
 tmp/
 output/
+assessment/ploidIA/dataset/extract_femi.py
+assessment/vIAbility/data/antiguo/extract_FEMI_features_antiguo.py
+markers/stage_classification/data/femi_prep.py

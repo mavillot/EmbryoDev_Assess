@@ -6,7 +6,7 @@
 
 # PATHS to things
 
-PATH_DATASET='../Datasets/Processed/'
+PATH_DATASET='/data/mvillota/Datasets/Datasets/Processed/'
 PATH_MODELS='models/'
 TMP_PATH = 'tmp/'
 OUTPUT_PATH = 'output/'
