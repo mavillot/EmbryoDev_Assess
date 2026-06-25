@@ -1,0 +1,17 @@
+Bagging_MLPClassifier
+
+Accuracy : 0.4767
+Precision: 0.5455
+Recall   : 0.1304
+F1       : 0.2105
+Fbeta(0.5): 0.3333
+AUROC    : 0.5603
+
+              precision    recall  f1-score   support
+
+   Aneuploid       0.47      0.88      0.61        40
+     Euploid       0.55      0.13      0.21        46
+
+    accuracy                           0.48        86
+   macro avg       0.51      0.50      0.41        86
+weighted avg       0.51      0.48      0.40        86

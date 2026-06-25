@@ -1,0 +1,17 @@
+Voting_soft_RandomForest+DecisionTree+MLPClassifier
+
+Accuracy: 0.4505
+Precision: 0.3659
+Recall: 0.3846
+Fbeta: 0.3695
+F1: 0.3750
+Auroc: 0.4546
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.52      0.50      0.51        52
+         FHB       0.37      0.38      0.38        39
+
+    accuracy                           0.45        91
+   macro avg       0.44      0.44      0.44        91
+weighted avg       0.45      0.45      0.45        91

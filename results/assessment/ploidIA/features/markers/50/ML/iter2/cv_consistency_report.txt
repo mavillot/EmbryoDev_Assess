@@ -1,0 +1,132 @@
+
+==========================================================================================
+Consistency report (CV vs Test)
+==========================================================================================
+
+RandomForest
+  accuracy   CV=59.82% ± 9.10% | TEST=45.35% | ⚠ pessimistic
+  precision  CV=61.09% ± 7.54% | TEST=48.65% | ⚠ pessimistic
+  recall     CV=68.48% ± 8.30% | TEST=39.13% | ⚠ pessimistic
+  f1         CV=64.53% ± 7.71% | TEST=43.37% | ⚠ pessimistic
+  fbeta      CV=62.41% ± 7.57% | TEST=46.39% | ⚠ pessimistic
+  auroc      CV=60.70% ± 11.33% | TEST=46.47% | ✓ consistent
+
+GaussianNB
+  accuracy   CV=57.26% ± 7.78% | TEST=59.30% | ✓ consistent
+  precision  CV=56.90% ± 5.07% | TEST=57.97% | ✓ consistent
+  recall     CV=82.85% ± 7.28% | TEST=86.96% | ✓ consistent
+  f1         CV=67.42% ± 5.70% | TEST=69.57% | ✓ consistent
+  fbeta      CV=60.68% ± 5.28% | TEST=62.11% | ✓ consistent
+  auroc      CV=57.23% ± 10.11% | TEST=54.46% | ✓ consistent
+
+DecisionTree
+  accuracy   CV=50.32% ± 7.81% | TEST=48.84% | ✓ consistent
+  precision  CV=52.46% ± 6.59% | TEST=52.27% | ✓ consistent
+  recall     CV=57.45% ± 13.56% | TEST=50.00% | ✓ consistent
+  f1         CV=54.61% ± 9.76% | TEST=51.11% | ✓ consistent
+  fbeta      CV=53.25% ± 7.78% | TEST=51.80% | ✓ consistent
+  auroc      CV=51.72% ± 8.46% | TEST=50.03% | ✓ consistent
+
+MLPClassifier
+  accuracy   CV=54.74% ± 1.85% | TEST=59.30% | ⚠ optimistic
+  precision  CV=54.11% ± 1.29% | TEST=59.02% | ⚠ optimistic
+  recall     CV=99.31% ± 1.38% | TEST=78.26% | ⚠ pessimistic
+  f1         CV=70.04% ± 1.28% | TEST=67.29% | ⚠ pessimistic
+  fbeta      CV=59.53% ± 1.30% | TEST=62.07% | ⚠ optimistic
+  auroc      CV=49.38% ± 7.09% | TEST=57.66% | ✓ consistent
+
+LogisticRegression
+  accuracy   CV=58.38% ± 6.03% | TEST=45.35% | ⚠ pessimistic
+  precision  CV=60.47% ± 5.51% | TEST=48.94% | ⚠ pessimistic
+  recall     CV=64.41% ± 4.37% | TEST=50.00% | ⚠ pessimistic
+  f1         CV=62.33% ± 4.75% | TEST=49.46% | ⚠ pessimistic
+  fbeta      CV=61.19% ± 5.18% | TEST=49.15% | ⚠ pessimistic
+  auroc      CV=60.20% ± 6.27% | TEST=42.61% | ⚠ pessimistic
+
+TabPFN
+  accuracy   CV=58.38% ± 4.23% | TEST=50.00% | ⚠ pessimistic
+  precision  CV=57.86% ± 2.71% | TEST=52.46% | ⚠ pessimistic
+  recall     CV=81.49% ± 5.20% | TEST=69.57% | ⚠ pessimistic
+  f1         CV=67.60% ± 2.99% | TEST=59.81% | ⚠ pessimistic
+  fbeta      CV=61.38% ± 2.69% | TEST=55.17% | ⚠ pessimistic
+  auroc      CV=59.50% ± 8.36% | TEST=55.52% | ✓ consistent
+
+Bagging_RandomForest
+  accuracy   CV=56.18% ± 4.82% | TEST=50.00% | ✓ consistent
+  precision  CV=57.31% ± 3.75% | TEST=53.33% | ✓ consistent
+  recall     CV=69.84% ± 5.62% | TEST=52.17% | ⚠ pessimistic
+  f1         CV=62.91% ± 4.17% | TEST=52.75% | ⚠ pessimistic
+  fbeta      CV=59.42% ± 3.83% | TEST=53.10% | ⚠ pessimistic
+  auroc      CV=57.77% ± 9.74% | TEST=47.04% | ✓ consistent
+
+Bagging_SVC
+  accuracy   CV=58.01% ± 9.52% | TEST=44.19% | ✓ consistent
+  precision  CV=61.72% ± 9.95% | TEST=47.37% | ✓ consistent
+  recall     CV=57.54% ± 10.33% | TEST=39.13% | ⚠ pessimistic
+  f1         CV=59.25% ± 9.18% | TEST=42.86% | ⚠ pessimistic
+  fbeta      CV=60.62% ± 9.33% | TEST=45.45% | ⚠ pessimistic
+  auroc      CV=60.59% ± 9.45% | TEST=45.92% | ⚠ pessimistic
+
+Bagging_GaussianNB
+  accuracy   CV=57.63% ± 6.99% | TEST=59.30% | ✓ consistent
+  precision  CV=56.87% ± 4.33% | TEST=57.97% | ✓ consistent
+  recall     CV=85.61% ± 7.04% | TEST=86.96% | ✓ consistent
+  f1         CV=68.30% ± 5.09% | TEST=69.57% | ✓ consistent
+  fbeta      CV=60.94% ± 4.57% | TEST=62.11% | ✓ consistent
+  auroc      CV=57.20% ± 10.29% | TEST=54.02% | ✓ consistent
+
+Bagging_DecisionTree
+  accuracy   CV=49.60% ± 7.66% | TEST=43.02% | ✓ consistent
+  precision  CV=52.35% ± 6.53% | TEST=46.94% | ✓ consistent
+  recall     CV=55.45% ± 11.64% | TEST=50.00% | ✓ consistent
+  f1         CV=53.61% ± 8.31% | TEST=48.42% | ✓ consistent
+  fbeta      CV=52.79% ± 7.03% | TEST=47.52% | ✓ consistent
+  auroc      CV=51.24% ± 9.05% | TEST=42.58% | ✓ consistent
+
+Bagging_MLPClassifier
+  accuracy   CV=44.91% ± 8.44% | TEST=63.95% | ⚠ optimistic
+  precision  CV=50.59% ± 15.54% | TEST=66.67% | ✓ consistent
+  recall     CV=28.85% ± 9.55% | TEST=65.22% | ⚠ optimistic
+  f1         CV=35.34% ± 8.71% | TEST=65.93% | ⚠ optimistic
+  fbeta      CV=42.25% ± 9.51% | TEST=66.37% | ⚠ optimistic
+  auroc      CV=47.36% ± 11.34% | TEST=65.71% | ⚠ optimistic
+
+Bagging_LogisticRegression
+  accuracy   CV=57.65% ± 4.65% | TEST=44.19% | ⚠ pessimistic
+  precision  CV=59.99% ± 4.61% | TEST=47.92% | ⚠ pessimistic
+  recall     CV=63.06% ± 4.09% | TEST=50.00% | ⚠ pessimistic
+  f1         CV=61.38% ± 3.52% | TEST=48.94% | ⚠ pessimistic
+  fbeta      CV=60.51% ± 4.04% | TEST=48.32% | ⚠ pessimistic
+  auroc      CV=58.66% ± 6.78% | TEST=42.01% | ⚠ pessimistic
+
+Bagging_TabPFN
+  accuracy   CV=58.02% ± 3.90% | TEST=51.16% | ⚠ pessimistic
+  precision  CV=57.89% ± 2.75% | TEST=54.00% | ✓ consistent
+  recall     CV=78.78% ± 4.99% | TEST=58.70% | ⚠ pessimistic
+  f1         CV=66.66% ± 2.80% | TEST=56.25% | ⚠ pessimistic
+  fbeta      CV=61.10% ± 2.66% | TEST=54.88% | ⚠ pessimistic
+  auroc      CV=59.58% ± 7.11% | TEST=50.11% | ✓ consistent
+
+Voting_soft_RandomForest+DecisionTree+LogisticRegression+TabPFN
+  accuracy   CV=55.80% ± 6.31% | TEST=52.33% | ✓ consistent
+  precision  CV=56.81% ± 4.48% | TEST=55.32% | ✓ consistent
+  recall     CV=69.84% ± 8.06% | TEST=56.52% | ⚠ pessimistic
+  f1         CV=62.63% ± 5.93% | TEST=55.91% | ✓ consistent
+  fbeta      CV=59.00% ± 5.00% | TEST=55.56% | ✓ consistent
+  auroc      CV=58.34% ± 9.46% | TEST=48.59% | ✓ consistent
+
+Voting_soft_RandomForest+SVC+DecisionTree+LogisticRegression+TabPFN
+  accuracy   CV=56.91% ± 5.06% | TEST=50.00% | ✓ consistent
+  precision  CV=57.56% ± 3.56% | TEST=53.19% | ✓ consistent
+  recall     CV=72.60% ± 5.78% | TEST=54.35% | ⚠ pessimistic
+  f1         CV=64.19% ± 4.37% | TEST=53.76% | ⚠ pessimistic
+  fbeta      CV=60.04% ± 3.83% | TEST=53.42% | ⚠ pessimistic
+  auroc      CV=58.62% ± 9.26% | TEST=48.80% | ✓ consistent
+
+Voting_soft_DecisionTree+TabPFN
+  accuracy   CV=52.51% ± 6.16% | TEST=50.00% | ✓ consistent
+  precision  CV=54.20% ± 4.68% | TEST=52.94% | ✓ consistent
+  recall     CV=67.08% ± 10.92% | TEST=58.70% | ✓ consistent
+  f1         CV=59.78% ± 6.89% | TEST=55.67% | ✓ consistent
+  fbeta      CV=56.27% ± 5.36% | TEST=54.00% | ✓ consistent
+  auroc      CV=54.46% ± 9.43% | TEST=52.99% | ✓ consistent

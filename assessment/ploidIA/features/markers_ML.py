@@ -5,6 +5,8 @@ import argparse
 import joblib
 import itertools
 import json
+import csv
+from datetime import datetime
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -39,14 +41,22 @@ from config.config import SEED, PARAM_GRID, PATH_MODELS, PATH_DATASET
 
 classmap = {"Aneuploid": 0, "Euploid": 1}
 
-PATH_DATA   = Path(PATH_DATASET + "EasyFiv/markers/")
-PATH_DATA1  = Path(PATH_DATASET + "Quiron_ploidy/markers/")
-PATH_MODELS = Path(PATH_MODELS  + "assessment/ploidIA/EasyFiv/markers_200/ML/")
-PATH_OUTPUT = Path("results/assessment/ploidIA/EasyFiv/markers_200/ML/")
 
 N_CLUSTERS = 5
 CV_FOLDS   = 5
 VAL_SIZE   = 0.2
+
+
+def append_metrics_row(csv_path: str, row: dict) -> None:
+    """Append one row, creating the file+header on first call."""
+    p = Path(csv_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    file_exists = p.exists()
+    with open(p, "a", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=list(row.keys()))
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow(row)
 
 random.seed(SEED)
 np.random.seed(SEED)
@@ -67,7 +77,7 @@ CV_SCORING = {
     "recall":    make_scorer(recall_score,    pos_label=1, zero_division=0),
     "f1":        make_scorer(f1_score,        pos_label=1, zero_division=0),
     "fbeta":     make_scorer(fbeta_score, beta=0.5, pos_label=1, zero_division=0),
-    "auroc":     make_scorer(roc_auc_score, needs_proba=True),
+    "auroc":     make_scorer(roc_auc_score, response_method="predict_proba"),
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -495,10 +505,10 @@ def evaluate_and_save(models: dict, X_test: np.ndarray, y_test: np.ndarray, path
         plt.close(fig)
 
         # Save model
-        model_path = Path(path_model) / f"{name}.joblib"
-        model_path.parent.mkdir(parents=True, exist_ok=True)
-        joblib.dump(clf, model_path)
-        print(f"Saved model → {model_path}")
+        # model_path = Path(path_model) / f"{name}.joblib"
+        # model_path.parent.mkdir(parents=True, exist_ok=True)
+        # joblib.dump(clf, model_path)
+        # print(f"Saved model → {model_path}")
 
     summary = "\n".join(summary_lines)
     (out_dir / "all_results.txt").write_text(summary)
@@ -511,33 +521,64 @@ def evaluate_and_save(models: dict, X_test: np.ndarray, y_test: np.ndarray, path
 # ──────────────────────────────────────────────────────────────────────────────
 
 def main(args):
+    # ── Seed THIS outer repeat ───────────────────────────────────────────────
+    # Previously every random-state-bearing step (clustering, the train/val
+    # split, bagging, the diagnostic CV) was pinned to the same module-level
+    # SEED — repeats would have been bit-for-bit identical. Now every one of
+    # those steps uses this repeat's own seed. The held-out test set is
+    # loaded from a fixed folder and is unaffected, as it should be.
+    iteration = getattr(args, "iteration", 0)
+    seed      = getattr(args, "seed", SEED)
+    random.seed(seed)
+    np.random.seed(seed)
+
     print("Loading data...")
-    X_full_train, y_full_train   = load_data(PATH_DATA, split="train")
-    #X_full_train1, y_full_train1 = load_data(PATH_DATA1, split="train")
-    X_test, y_test               = load_data(PATH_DATA, split="test")
-    #X_test1, y_test1             = load_data(PATH_DATA1, split="test")
+    if args.dataset == "EasyFiv":
+        PATH_DATA   = Path(PATH_DATASET + "EasyFiv/markers/")
+        X_full_train, y_full_train   = load_data(PATH_DATA, split="train")
+        X_test, y_test               = load_data(PATH_DATA, split="test")
+        
+    elif args.dataset == "Quiron_ploidy":
+        PATH_DATA   = Path(PATH_DATASET + "Quiron_ploidy/markers/")
+        X_full_train, y_full_train   = load_data(PATH_DATA, split="train")
+        X_test, y_test               = load_data(PATH_DATA, split="test")
+
+    elif args.dataset == "Combined":
+        PATH_DATA   = Path(PATH_DATASET + "EasyFiv/markers/")
+        PATH_DATA1  = Path(PATH_DATASET + "Quiron_ploidy/markers/")
+        X_full_train, y_full_train   = load_data(PATH_DATA, split="train")
+        X_full_train1, y_full_train1 = load_data(PATH_DATA1, split="train")
+        X_test, y_test               = load_data(PATH_DATA, split="test")
+        X_test1, y_test1             = load_data(PATH_DATA1, split="test")
+    
+    PATH_OUTPUT = Path(f"results/assessment/ploidIA/{args.dataset}/markers/{args.n_frames}/ML/")
+    METRICS_CSV = str(PATH_OUTPUT / "experiment_results.csv")
+    out_dir     = Path(PATH_OUTPUT) / f"iter{iteration}"
+    # path_models = Path(PATH_MODELS) / f"assessment/ploidIA/{args.dataset}/markers/{args.n_frames}/ML/" / f"iter{iteration}"
+
     columns                      = list(X_full_train.keys())
     for key in columns:
         n = np.linspace(0, X_full_train[key].shape[1]-1, args.n_frames, dtype=int)
         X_full_train[key] = X_full_train[key][:, n]
         X_test[key]       = X_test[key][:, n]
-        # n1 = np.linspace(0, X_full_train1[key].shape[1]-1, args.n_frames, dtype=int)
-        # X_full_train1[key] = X_full_train1[key][:, n1]
-        # X_test1[key]      = X_test1[key][:, n1]
+        if args.dataset == "Combined":
+            n1 = np.linspace(0, X_full_train1[key].shape[1]-1, args.n_frames, dtype=int)
+            X_full_train1[key] = X_full_train1[key][:, n1]
+            X_test1[key]      = X_test1[key][:, n1]
 
-    # Combine datasets
-    # for key in X_full_train:
-    #     X_full_train[key] = np.concatenate([X_full_train[key], X_full_train1[key]], axis=0)
-    #     X_test[key]       = np.concatenate([X_test[key], X_test1[key]], axis=0)
-    # y_full_train = np.concatenate([y_full_train, y_full_train1], axis=0)
-    # y_test = np.concatenate([y_test, y_test1], axis=0)
-    
-    
+    if args.dataset == "Combined":
+        for key in X_full_train:
+            X_full_train[key] = np.concatenate([X_full_train[key], X_full_train1[key]], axis=0)
+            X_test[key]       = np.concatenate([X_test[key], X_test1[key]], axis=0)
+        y_full_train = np.concatenate([y_full_train, y_full_train1], axis=0)
+        y_test = np.concatenate([y_test, y_test1], axis=0)
+
+
     print(f"Features: {columns}")
 
     # Clustering
     print("\nFitting clustering models...")
-    cluster_models  = fit_cluster_models(X_full_train, columns, args.n_clusters, SEED)
+    cluster_models  = fit_cluster_models(X_full_train, columns, args.n_clusters, seed)
     X_full_train_cl = apply_clusters(cluster_models, X_full_train, len(y_full_train))
     X_test_cl       = apply_clusters(cluster_models, X_test, len(y_test))
     print(f"\nClustered shape: {X_full_train_cl.shape}")
@@ -545,7 +586,7 @@ def main(args):
     # Validation split
     X_train_cl, X_val_cl, y_train, y_val = train_test_split(
         X_full_train_cl, y_full_train,
-        test_size=args.val_size, stratify=y_full_train, random_state=SEED,
+        test_size=args.val_size, stratify=y_full_train, random_state=seed,
     )
     print("\nDataset split:")
     print(f"Train: {len(y_train)}")
@@ -575,7 +616,7 @@ def main(args):
 
     # Bagging
     print("\nTraining bagging models...")
-    bagging_models = build_bagging_classifiers(best_params, SEED)
+    bagging_models = build_bagging_classifiers(best_params, seed)
     for name, clf in bagging_models.items():
         print(f"  Fitting {name}")
         clf.fit(X_final_train, y_final_train)
@@ -599,20 +640,45 @@ def main(args):
     all_models = {**best_models, **bagging_models, **final_voting_models}
 
     # Cross-validation
-    cv_results = cross_validate_models(all_models, X_train_cl, y_train, n_folds=args.cv_folds, seed=SEED)
+    cv_results = cross_validate_models(all_models, X_train_cl, y_train, n_folds=args.cv_folds, seed=seed)
 
     # Final test evaluation
     test_metrics = evaluate_and_save(
         all_models, X_test_cl, y_test,
-        path_model=args.path_models, out_dir=args.out_dir,
+        path_model="", out_dir=str(out_dir),
     )
 
-    save_cv_results(cv_results, Path(args.out_dir), test_metrics=test_metrics, best_params=best_params)
+    save_cv_results(cv_results, out_dir, test_metrics=test_metrics, best_params=best_params)
 
     # CV vs Test comparison
-    print_consistency_report(cv_results, test_metrics, Path(args.out_dir))
+    print_consistency_report(cv_results, test_metrics, out_dir)
     for metric in CV_SCORING:
-        plot_cv_results(cv_results, test_metrics, Path(args.out_dir), metric=metric)
+        plot_cv_results(cv_results, test_metrics, out_dir, metric=metric)
+
+    # ── Log every model's results for THIS repeat to the master CSV ─────────
+    timestamp = datetime.now().isoformat(timespec="seconds")
+    rows = []
+    for name in all_models:
+        row = {
+            "timestamp": timestamp,
+            "iteration": iteration,
+            "seed": seed,
+            "n_frames": args.n_frames,
+            "model": name,
+        }
+        for m, v in test_metrics.get(name, {}).items():
+            row[f"test_{m}"] = v
+        cv_for_model = cv_results.get(name)
+        if cv_for_model is not None:
+            for m, stats in cv_for_model.items():
+                row[f"cv_{m}_mean"] = stats["mean"]
+                row[f"cv_{m}_std"] = stats["std"]
+        rows.append(row)
+        append_metrics_row(METRICS_CSV, row)
+
+    print(f"Logged {len(rows)} model rows (iteration={iteration}) to {METRICS_CSV}")
+
+    return pd.DataFrame(rows)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Entry point
@@ -622,14 +688,21 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="ploidIA classification via time-series clustering + ML"
     )
+    parser.add_argument("--dataset",     type=str,   default="EasyFiv", choices=["EasyFiv", "Quiron_ploidy", "Combined"])
     parser.add_argument("--n_frames",    type=int,   default=50)
     parser.add_argument("--n_clusters",  type=int,   default=N_CLUSTERS)
-    parser.add_argument("--path_models",             default=PATH_MODELS)
-    parser.add_argument("--out_dir",                 default=PATH_OUTPUT)
+    # parser.add_argument("--path_models",             default="")
+    # parser.add_argument("--out_dir",                 default="")
     parser.add_argument("--vote_min",    type=int,   default=2)
     parser.add_argument("--vote_max",    type=int,   default=None)
     parser.add_argument("--voting",                  default="both", choices=["hard", "soft", "both"])
     parser.add_argument("--vote_top_k",  type=int,   default=3)
     parser.add_argument("--cv_folds",    type=int,   default=CV_FOLDS)
     parser.add_argument("--val_size",    type=float, default=VAL_SIZE)
+    parser.add_argument("--iteration",   type=int,   default=0,
+                         help="Outer repeat number (0 for a standalone run). Only affects "
+                              "output paths and the iteration/seed columns in the results CSV.")
+    parser.add_argument("--seed",        type=int,   default=SEED,
+                         help="Seed for this outer repeat (clustering, train/val split, "
+                              "bagging, diagnostic CV). The held-out test set is unaffected.")
     main(parser.parse_args())

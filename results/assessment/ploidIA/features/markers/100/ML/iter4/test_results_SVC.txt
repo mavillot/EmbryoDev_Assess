@@ -1,0 +1,17 @@
+SVC
+
+Accuracy : 0.5581
+Precision: 0.5606
+Recall   : 0.8043
+F1       : 0.6607
+Fbeta(0.5): 0.5968
+AUROC    : 0.5848
+
+              precision    recall  f1-score   support
+
+   Aneuploid       0.55      0.28      0.37        40
+     Euploid       0.56      0.80      0.66        46
+
+    accuracy                           0.56        86
+   macro avg       0.56      0.54      0.51        86
+weighted avg       0.56      0.56      0.52        86

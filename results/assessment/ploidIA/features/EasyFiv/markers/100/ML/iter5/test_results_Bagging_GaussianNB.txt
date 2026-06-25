@@ -1,0 +1,17 @@
+Bagging_GaussianNB
+
+Accuracy : 0.3500
+Precision: 0.0000
+Recall   : 0.0000
+F1       : 0.0000
+Fbeta(0.5): 0.0000
+AUROC    : 0.4502
+
+              precision    recall  f1-score   support
+
+   Aneuploid       0.37      0.88      0.52        24
+     Euploid       0.00      0.00      0.00        36
+
+    accuracy                           0.35        60
+   macro avg       0.18      0.44      0.26        60
+weighted avg       0.15      0.35      0.21        60

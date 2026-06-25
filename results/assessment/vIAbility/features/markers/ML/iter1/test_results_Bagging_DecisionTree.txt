@@ -1,0 +1,17 @@
+Bagging_DecisionTree
+
+Accuracy: 0.4396
+Precision: 0.3696
+Recall: 0.4359
+Fbeta: 0.3812
+F1: 0.4000
+Auroc: 0.4031
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.51      0.44      0.47        52
+         FHB       0.37      0.44      0.40        39
+
+    accuracy                           0.44        91
+   macro avg       0.44      0.44      0.44        91
+weighted avg       0.45      0.44      0.44        91

@@ -1,0 +1,17 @@
+DecisionTree
+
+Accuracy : 0.5500
+Precision: 0.9091
+Recall   : 0.2778
+F1       : 0.4255
+Fbeta(0.5): 0.6250
+AUROC    : 0.6626
+
+              precision    recall  f1-score   support
+
+   Aneuploid       0.47      0.96      0.63        24
+     Euploid       0.91      0.28      0.43        36
+
+    accuracy                           0.55        60
+   macro avg       0.69      0.62      0.53        60
+weighted avg       0.73      0.55      0.51        60

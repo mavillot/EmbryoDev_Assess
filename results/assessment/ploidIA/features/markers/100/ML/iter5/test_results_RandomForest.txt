@@ -1,0 +1,17 @@
+RandomForest
+
+Accuracy : 0.5465
+Precision: 0.5556
+Recall   : 0.7609
+F1       : 0.6422
+Fbeta(0.5): 0.5872
+AUROC    : 0.5543
+
+              precision    recall  f1-score   support
+
+   Aneuploid       0.52      0.30      0.38        40
+     Euploid       0.56      0.76      0.64        46
+
+    accuracy                           0.55        86
+   macro avg       0.54      0.53      0.51        86
+weighted avg       0.54      0.55      0.52        86

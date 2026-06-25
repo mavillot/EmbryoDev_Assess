@@ -1,0 +1,17 @@
+Voting_hard_SVC+GaussianNB+DecisionTree
+
+Accuracy: 0.5714
+Precision: 0.5000
+Recall: 0.1538
+Fbeta: 0.3448
+F1: 0.2353
+Auroc: nan
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.58      0.88      0.70        52
+         FHB       0.50      0.15      0.24        39
+
+    accuracy                           0.57        91
+   macro avg       0.54      0.52      0.47        91
+weighted avg       0.55      0.57      0.50        91

@@ -1,0 +1,17 @@
+Bagging_LogisticRegression
+
+Accuracy: 0.4396
+Precision: 0.3571
+Recall: 0.3846
+Fbeta: 0.3623
+F1: 0.3704
+Auroc: 0.5039
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.51      0.48      0.50        52
+         FHB       0.36      0.38      0.37        39
+
+    accuracy                           0.44        91
+   macro avg       0.43      0.43      0.43        91
+weighted avg       0.44      0.44      0.44        91

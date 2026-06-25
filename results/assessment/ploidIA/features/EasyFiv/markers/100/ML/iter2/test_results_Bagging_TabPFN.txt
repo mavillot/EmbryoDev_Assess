@@ -1,0 +1,17 @@
+Bagging_TabPFN
+
+Accuracy : 0.6000
+Precision: 0.6071
+Recall   : 0.9444
+F1       : 0.7391
+Fbeta(0.5): 0.6538
+AUROC    : 0.5127
+
+              precision    recall  f1-score   support
+
+   Aneuploid       0.50      0.08      0.14        24
+     Euploid       0.61      0.94      0.74        36
+
+    accuracy                           0.60        60
+   macro avg       0.55      0.51      0.44        60
+weighted avg       0.56      0.60      0.50        60

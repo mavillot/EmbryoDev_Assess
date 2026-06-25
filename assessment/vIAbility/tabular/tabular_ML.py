@@ -189,7 +189,7 @@ for clf_name in classifiers_config:
     pprint.pprint(individual_metrics)
 
     os.makedirs("results/assessment/vIAbility/tabular", exist_ok=True)
-    df_summary.to_csv("results/assessment/vIAbility/tabular/ml_models_individual.csv", index=False)
+    df_summary.to_csv(f"results/assessment/vIAbility/tabular/ml_models_individual_{clf_name}.csv", index=False)
 
     summary_rows.append({
         'Model': clf_name,

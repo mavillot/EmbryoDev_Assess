@@ -1,0 +1,17 @@
+Bagging_SVC
+
+Accuracy : 0.5500
+Precision: 0.6216
+Recall   : 0.6389
+F1       : 0.6301
+Fbeta(0.5): 0.6250
+AUROC    : 0.5203
+
+              precision    recall  f1-score   support
+
+   Aneuploid       0.43      0.42      0.43        24
+     Euploid       0.62      0.64      0.63        36
+
+    accuracy                           0.55        60
+   macro avg       0.53      0.53      0.53        60
+weighted avg       0.55      0.55      0.55        60

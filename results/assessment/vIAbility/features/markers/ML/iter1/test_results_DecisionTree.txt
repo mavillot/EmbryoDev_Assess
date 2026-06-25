@@ -1,0 +1,17 @@
+DecisionTree
+
+Accuracy: 0.4396
+Precision: 0.3889
+Recall: 0.5385
+Fbeta: 0.4118
+F1: 0.4516
+Auroc: 0.4507
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.51      0.37      0.43        52
+         FHB       0.39      0.54      0.45        39
+
+    accuracy                           0.44        91
+   macro avg       0.45      0.45      0.44        91
+weighted avg       0.46      0.44      0.44        91

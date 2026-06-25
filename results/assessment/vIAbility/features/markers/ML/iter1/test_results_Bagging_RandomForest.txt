@@ -1,0 +1,17 @@
+Bagging_RandomForest
+
+Accuracy: 0.5055
+Precision: 0.3846
+Recall: 0.2564
+Fbeta: 0.3497
+F1: 0.3077
+Auroc: 0.4847
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.55      0.69      0.62        52
+         FHB       0.38      0.26      0.31        39
+
+    accuracy                           0.51        91
+   macro avg       0.47      0.47      0.46        91
+weighted avg       0.48      0.51      0.48        91

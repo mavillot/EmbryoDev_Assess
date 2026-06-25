@@ -1,0 +1,17 @@
+GaussianNB
+
+Accuracy: 0.5934
+Precision: 0.5357
+Recall: 0.3846
+Fbeta: 0.4967
+F1: 0.4478
+Auroc: 0.5922
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.62      0.75      0.68        52
+         FHB       0.54      0.38      0.45        39
+
+    accuracy                           0.59        91
+   macro avg       0.58      0.57      0.56        91
+weighted avg       0.58      0.59      0.58        91

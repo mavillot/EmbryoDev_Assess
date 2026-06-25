@@ -1,0 +1,17 @@
+TabPFN
+
+Accuracy: 0.5495
+Precision: 0.0000
+Recall: 0.0000
+Fbeta: 0.0000
+F1: 0.0000
+Auroc: 0.6072
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.56      0.96      0.71        52
+         FHB       0.00      0.00      0.00        39
+
+    accuracy                           0.55        91
+   macro avg       0.28      0.48      0.35        91
+weighted avg       0.32      0.55      0.41        91

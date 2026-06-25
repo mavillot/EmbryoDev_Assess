@@ -1,0 +1,17 @@
+Bagging_GaussianNB
+
+Accuracy: 0.5714
+Precision: 0.5000
+Recall: 0.1795
+Fbeta: 0.3684
+F1: 0.2642
+Auroc: 0.6548
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.58      0.87      0.70        52
+         FHB       0.50      0.18      0.26        39
+
+    accuracy                           0.57        91
+   macro avg       0.54      0.52      0.48        91
+weighted avg       0.55      0.57      0.51        91

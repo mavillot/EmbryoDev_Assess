@@ -1,0 +1,17 @@
+MLPClassifier
+
+Accuracy: 0.4945
+Precision: 0.4255
+Recall: 0.5128
+Fbeta: 0.4405
+F1: 0.4651
+Auroc: 0.5150
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.57      0.48      0.52        52
+         FHB       0.43      0.51      0.47        39
+
+    accuracy                           0.49        91
+   macro avg       0.50      0.50      0.49        91
+weighted avg       0.51      0.49      0.50        91

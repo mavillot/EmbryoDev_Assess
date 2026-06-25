@@ -1,0 +1,17 @@
+Bagging_DecisionTree
+
+Accuracy : 0.4615
+Precision: 0.1667
+Recall   : 0.1000
+F1       : 0.1250
+Fbeta(0.5): 0.1471
+AUROC    : 0.4688
+
+              precision    recall  f1-score   support
+
+   Aneuploid       0.55      0.69      0.61        16
+     Euploid       0.17      0.10      0.12        10
+
+    accuracy                           0.46        26
+   macro avg       0.36      0.39      0.37        26
+weighted avg       0.40      0.46      0.42        26

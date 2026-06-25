@@ -1,0 +1,17 @@
+TabPFN
+
+Accuracy : 0.6000
+Precision: 0.6034
+Recall   : 0.9722
+F1       : 0.7447
+Fbeta(0.5): 0.6530
+AUROC    : 0.5012
+
+              precision    recall  f1-score   support
+
+   Aneuploid       0.50      0.04      0.08        24
+     Euploid       0.60      0.97      0.74        36
+
+    accuracy                           0.60        60
+   macro avg       0.55      0.51      0.41        60
+weighted avg       0.56      0.60      0.48        60

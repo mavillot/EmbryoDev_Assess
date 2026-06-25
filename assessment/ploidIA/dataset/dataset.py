@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 
 class_map = {"Euploid": 1, "Aneuploid": 0}
     
-def build_labels(video_files: list[str], df: pd.DataFrame) -> list[int]:
+def build_labels(video_files: list[str]) -> list[int]:
     """Return a label for every video file in *video_files*."""
     labels = []
     for filename in video_files:
@@ -23,7 +23,7 @@ class VideoDataset(Dataset):
     START_TIMES = [0, 5, 7, 11, 15, 17, 24, 30,35, 37, 40, 42, 48,52, 55, 60, 65, 70,72, 80]
     FREQUENCIES = [0.2, 2, 5, 7, 15, 20, 24]
 
-    def __init__(self, video_files, labels, video_dir, df, frame_w, frame_h, n_frames, augment=True, oversample=False, factor_clase_1=3, factor_clase_0=1.5, tabular_lookup=None):
+    def __init__(self, video_files, labels, video_dir, frame_w, frame_h, n_frames, augment=True, oversample=False, factor_clase_1=3, factor_clase_0=1.5, tabular_lookup=None):
         self.video_dir   = video_dir
         self.augment     = augment
         self.n_frames    = n_frames
@@ -31,18 +31,14 @@ class VideoDataset(Dataset):
         self.frame_h     = frame_h
         self.tabular_lookup = tabular_lookup
         if oversample:
-            # Listas vacías para construir nuestro dataset balanceado y expandido
             final_video_files = []
             final_labels = []
             
             for video, label in zip(video_files, labels):
                 if label == 1:
-                    # Multiplicamos los videos de la clase 1 por el factor deseado (ej. 3 veces)
                     final_video_files.extend([video] * factor_clase_1)
                     final_labels.extend([label] * factor_clase_1)
                 else:
-                    # Multiplicamos o mantenemos la clase 0 según busques expandirla (ej. un 50% más mediante factor 1.5)
-                    # Para factores decimales, usamos probabilidad:
                     veces = int(factor_clase_0) + (1 if random.random() < (factor_clase_0 % 1) else 0)
                     final_video_files.extend([video] * veces)
                     final_labels.extend([label] * veces)
@@ -59,8 +55,6 @@ class VideoDataset(Dataset):
     def __getitem__(self, idx):
         filename = self.video_files[idx]
         label    = self.labels[idx]
-
-        # Temporal sampling augmentation: only for positive class (label==1)
 
         if self.augment and label == 1:
             start_time = random.choice(self.START_TIMES)
@@ -160,15 +154,12 @@ class VideoDataset(Dataset):
     def _load_frames(self, filename, start_time, frequency):
         
         frames, mask = [], []
-
         cap = cv2.VideoCapture(filename)
+        # 1 frame each 5 minutes --> 12 frames = 1 hour
+        time_window = np.arange(12*start_time, 12*(start_time + self.n_frames * frequency), 12 * frequency)
         try:
             for t in time_window:
-                frame_idx = int((t - tse) * frame_hour)
-                if frame_idx < 0 or not cap.isOpened():
-                    frames.append(self._blank()); mask.append(1)
-                    continue
-                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+                cap.set(cv2.CAP_PROP_POS_FRAMES, t)
                 ret, img = cap.read()
                 if ret:
                     img = cv2.resize(img, (self.frame_w, self.frame_h),
@@ -230,16 +221,15 @@ def mixup_collate(batch, alpha=0.4):
         return frames_mixed, masks_mixed, labels_mixed
 
 
-def get_dataloaders(video_dir, excel_path, frame_w=112, frame_h=112, n_frames=30, augment=True, oversample=False, factor1=2, factor0=1.5, batch_size=8, num_workers=4,  device="cuda"):
-    df         = pd.read_excel(excel_path)
+def get_dataloaders(video_dir, frame_w=112, frame_h=112, n_frames=30, augment=True, oversample=False, factor1=2, factor0=1.5, batch_size=8, num_workers=4,  device="cuda"):
 
     X_train = glob.glob(os.path.join(video_dir, "train/*/*.avi"))
     X_test  = glob.glob(os.path.join(video_dir, "test/*/*.avi"))
-    y_train = build_labels(X_train, df)
-    y_test  = build_labels(X_test, df)
+    y_train = build_labels(X_train)
+    y_test  = build_labels(X_test)
 
-    train_ds = VideoDataset(X_train, y_train, video_dir, df, frame_w=frame_w, frame_h=frame_h, n_frames=n_frames, augment=augment, oversample=oversample, factor_clase_1=factor1, factor_clase_0=factor0)
-    test_ds  = VideoDataset(X_test,  y_test,  video_dir, df, frame_w=frame_w, frame_h=frame_h, n_frames=n_frames, augment=False, oversample=False)
+    train_ds = VideoDataset(X_train, y_train, video_dir, frame_w=frame_w, frame_h=frame_h, n_frames=n_frames, augment=augment, oversample=oversample, factor_clase_1=factor1, factor_clase_0=factor0)
+    test_ds  = VideoDataset(X_test,  y_test,  video_dir, frame_w=frame_w, frame_h=frame_h, n_frames=n_frames, augment=False, oversample=False)
 
     pin = (device == "cuda")
 

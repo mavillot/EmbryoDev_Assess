@@ -1,0 +1,17 @@
+Voting_hard_RandomForest+SVC+DecisionTree+MLPClassifier
+
+Accuracy : 0.5667
+Precision: 0.6786
+Recall   : 0.5278
+F1       : 0.5938
+Fbeta(0.5): 0.6419
+AUROC    : nan
+
+              precision    recall  f1-score   support
+
+   Aneuploid       0.47      0.62      0.54        24
+     Euploid       0.68      0.53      0.59        36
+
+    accuracy                           0.57        60
+   macro avg       0.57      0.58      0.56        60
+weighted avg       0.59      0.57      0.57        60

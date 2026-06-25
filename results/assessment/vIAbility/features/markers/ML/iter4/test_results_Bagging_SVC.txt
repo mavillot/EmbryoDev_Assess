@@ -1,0 +1,17 @@
+Bagging_SVC
+
+Accuracy: 0.5714
+Precision: 0.0000
+Recall: 0.0000
+Fbeta: 0.0000
+F1: 0.0000
+Auroc: 0.5096
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.57      1.00      0.73        52
+         FHB       0.00      0.00      0.00        39
+
+    accuracy                           0.57        91
+   macro avg       0.29      0.50      0.36        91
+weighted avg       0.33      0.57      0.42        91

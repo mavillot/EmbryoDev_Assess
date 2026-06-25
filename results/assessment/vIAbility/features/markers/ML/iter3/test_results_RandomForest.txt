@@ -1,0 +1,17 @@
+RandomForest
+
+Accuracy: 0.5055
+Precision: 0.4118
+Recall: 0.3590
+Fbeta: 0.4000
+F1: 0.3836
+Auroc: 0.4916
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.56      0.62      0.59        52
+         FHB       0.41      0.36      0.38        39
+
+    accuracy                           0.51        91
+   macro avg       0.49      0.49      0.49        91
+weighted avg       0.50      0.51      0.50        91

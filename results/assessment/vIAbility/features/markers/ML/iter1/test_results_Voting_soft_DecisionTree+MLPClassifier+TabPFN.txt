@@ -1,0 +1,17 @@
+Voting_soft_DecisionTree+MLPClassifier+TabPFN
+
+Accuracy: 0.5055
+Precision: 0.3750
+Recall: 0.2308
+Fbeta: 0.3333
+F1: 0.2857
+Auroc: 0.4463
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.55      0.71      0.62        52
+         FHB       0.38      0.23      0.29        39
+
+    accuracy                           0.51        91
+   macro avg       0.46      0.47      0.45        91
+weighted avg       0.48      0.51      0.48        91

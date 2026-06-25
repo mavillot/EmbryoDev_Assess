@@ -1,0 +1,17 @@
+Voting_soft_RandomForest+SVC+DecisionTree+MLPClassifier+LogisticRegression+TabPFN
+
+Accuracy: 0.4945
+Precision: 0.4103
+Recall: 0.4103
+Fbeta: 0.4103
+F1: 0.4103
+Auroc: 0.5537
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.56      0.56      0.56        52
+         FHB       0.41      0.41      0.41        39
+
+    accuracy                           0.49        91
+   macro avg       0.48      0.48      0.48        91
+weighted avg       0.49      0.49      0.49        91

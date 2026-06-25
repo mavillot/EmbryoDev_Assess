@@ -1,0 +1,17 @@
+Voting_soft_GaussianNB+DecisionTree+TabPFN
+
+Accuracy : 0.6163
+Precision: 0.5915
+Recall   : 0.9130
+F1       : 0.7179
+Fbeta(0.5): 0.6364
+AUROC    : 0.6334
+
+              precision    recall  f1-score   support
+
+   Aneuploid       0.73      0.28      0.40        40
+     Euploid       0.59      0.91      0.72        46
+
+    accuracy                           0.62        86
+   macro avg       0.66      0.59      0.56        86
+weighted avg       0.66      0.62      0.57        86

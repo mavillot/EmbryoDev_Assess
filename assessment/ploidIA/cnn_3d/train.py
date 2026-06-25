@@ -50,7 +50,6 @@ from config.config import PATH_DATASET, SEED
 
 VIDEO_DIR = os.path.join(PATH_DATASET, "EasyFiv/videos")
 VIDEO_DIR1 = os.path.join(PATH_DATASET, "Quiron_ploidy/videos")
-EXCEL_PATH = os.path.join(PATH_DATASET, "Oslo_ploidIA/Oslo_completo.xlsx")
 
 # Master CSV that accumulates ONE ROW PER RUN across every backbone /
 # n_frames / iteration combination. run_experiments.py reads this file to
@@ -268,7 +267,6 @@ def train(cfg: Optional[TrainConfig] = None):
     log.info("Building dataset …")
     train_loader, val_loader = get_dataloaders(
         video_dir   = VIDEO_DIR,
-        excel_path  = EXCEL_PATH,
         frame_h     = cfg.frame_h,
         frame_w     = cfg.frame_w,
         n_frames    = cfg.n_frames,
@@ -280,7 +278,21 @@ def train(cfg: Optional[TrainConfig] = None):
         num_workers = cfg.num_workers,
         device      = device,
     )
-
+    train_loader1, val_loader1 = get_dataloaders(
+        video_dir   = VIDEO_DIR1,
+        frame_h     = cfg.frame_h,
+        frame_w     = cfg.frame_w,
+        n_frames    = cfg.n_frames,
+        augment     = cfg.augmentation,
+        oversample  = cfg.oversample,
+        factor1     = cfg.factor1,
+        factor0     = cfg.factor0,
+        batch_size  = cfg.batch_size,
+        num_workers = cfg.num_workers,
+        device      = device,
+    )
+    train_loader.dataset.video_files.extend(train_loader1.dataset.video_files)
+    val_loader.dataset.video_files.extend(val_loader1.dataset.video_files)
     log.info("Train: %d  |  Val: %d", len(train_loader.dataset), len(val_loader.dataset))
 
     # ── Model ─────────────────────────────────────────────────────────────────

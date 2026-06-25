@@ -1,0 +1,17 @@
+Voting_soft_SVC+DecisionTree+MLPClassifier+LogisticRegression
+
+Accuracy: 0.5714
+Precision: 0.5000
+Recall: 0.6410
+Fbeta: 0.5230
+F1: 0.5618
+Auroc: 0.5981
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.66      0.52      0.58        52
+         FHB       0.50      0.64      0.56        39
+
+    accuracy                           0.57        91
+   macro avg       0.58      0.58      0.57        91
+weighted avg       0.59      0.57      0.57        91

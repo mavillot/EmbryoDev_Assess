@@ -1,0 +1,17 @@
+Bagging_TabPFN
+
+Accuracy: 0.5934
+Precision: 0.6000
+Recall: 0.1538
+Fbeta: 0.3797
+F1: 0.2449
+Auroc: 0.5838
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.59      0.92      0.72        52
+         FHB       0.60      0.15      0.24        39
+
+    accuracy                           0.59        91
+   macro avg       0.60      0.54      0.48        91
+weighted avg       0.60      0.59      0.52        91

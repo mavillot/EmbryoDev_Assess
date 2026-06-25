@@ -1,0 +1,17 @@
+LogisticRegression
+
+Accuracy : 0.5333
+Precision: 0.5741
+Recall   : 0.8611
+F1       : 0.6889
+Fbeta(0.5): 0.6151
+AUROC    : 0.5058
+
+              precision    recall  f1-score   support
+
+   Aneuploid       0.17      0.04      0.07        24
+     Euploid       0.57      0.86      0.69        36
+
+    accuracy                           0.53        60
+   macro avg       0.37      0.45      0.38        60
+weighted avg       0.41      0.53      0.44        60

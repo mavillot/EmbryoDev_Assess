@@ -1,0 +1,17 @@
+Voting_soft_SVC+DecisionTree
+
+Accuracy : 0.5930
+Precision: 0.6341
+Recall   : 0.5652
+F1       : 0.5977
+Fbeta(0.5): 0.6190
+AUROC    : 0.6060
+
+              precision    recall  f1-score   support
+
+   Aneuploid       0.56      0.62      0.59        40
+     Euploid       0.63      0.57      0.60        46
+
+    accuracy                           0.59        86
+   macro avg       0.59      0.60      0.59        86
+weighted avg       0.60      0.59      0.59        86

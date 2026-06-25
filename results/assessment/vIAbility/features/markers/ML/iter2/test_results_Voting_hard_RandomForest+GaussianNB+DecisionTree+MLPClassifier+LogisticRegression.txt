@@ -1,0 +1,17 @@
+Voting_hard_RandomForest+GaussianNB+DecisionTree+MLPClassifier+LogisticRegression
+
+Accuracy: 0.5824
+Precision: 0.5217
+Recall: 0.3077
+Fbeta: 0.4580
+F1: 0.3871
+Auroc: nan
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.60      0.79      0.68        52
+         FHB       0.52      0.31      0.39        39
+
+    accuracy                           0.58        91
+   macro avg       0.56      0.55      0.54        91
+weighted avg       0.57      0.58      0.56        91

@@ -1,0 +1,17 @@
+Bagging_LogisticRegression
+
+Accuracy : 0.5930
+Precision: 0.5846
+Recall   : 0.8261
+F1       : 0.6847
+Fbeta(0.5): 0.6209
+AUROC    : 0.6130
+
+              precision    recall  f1-score   support
+
+   Aneuploid       0.62      0.33      0.43        40
+     Euploid       0.58      0.83      0.68        46
+
+    accuracy                           0.59        86
+   macro avg       0.60      0.58      0.56        86
+weighted avg       0.60      0.59      0.56        86

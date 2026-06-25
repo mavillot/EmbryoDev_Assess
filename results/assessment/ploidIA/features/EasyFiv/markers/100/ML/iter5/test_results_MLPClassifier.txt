@@ -1,0 +1,17 @@
+MLPClassifier
+
+Accuracy : 0.4333
+Precision: 0.5333
+Recall   : 0.4444
+F1       : 0.4848
+Fbeta(0.5): 0.5128
+AUROC    : 0.5012
+
+              precision    recall  f1-score   support
+
+   Aneuploid       0.33      0.42      0.37        24
+     Euploid       0.53      0.44      0.48        36
+
+    accuracy                           0.43        60
+   macro avg       0.43      0.43      0.43        60
+weighted avg       0.45      0.43      0.44        60

@@ -1,0 +1,17 @@
+LogisticRegression
+
+Accuracy: 0.5495
+Precision: 0.4773
+Recall: 0.5385
+Fbeta: 0.4884
+F1: 0.5060
+Auroc: 0.5754
+
+              precision    recall  f1-score   support
+
+      no_FHB       0.62      0.56      0.59        52
+         FHB       0.48      0.54      0.51        39
+
+    accuracy                           0.55        91
+   macro avg       0.55      0.55      0.55        91
+weighted avg       0.56      0.55      0.55        91

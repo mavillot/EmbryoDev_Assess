@@ -46,9 +46,11 @@ import os
 import sys
 import glob
 import json
+import csv
 import random
 import logging
 import argparse
+from datetime import datetime
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -82,7 +84,21 @@ CLASSMAP = {"no_FHB": 0, "FHB": 1}
 
 BASE_DATASET = os.path.join(PATH_DATASET, "Oslo_viability")
 BASE_MODELS  = os.path.join(PATH_MODELS,  "assessment/vIAbility")
-BASE_OUTPUT  = "output/assessment/vIAbility"
+BASE_OUTPUT  = "results/assessment/vIAbility/features/"
+
+# Master CSV — one row per run, across every dataset/model/iteration combo.
+METRICS_CSV = os.path.join(BASE_OUTPUT, "experiment_results.csv")
+
+
+def append_metrics_row(csv_path: str, row: dict) -> None:
+    """Append one run's metrics row, creating the file+header on first call."""
+    os.makedirs(os.path.dirname(csv_path) or ".", exist_ok=True)
+    file_exists = os.path.exists(csv_path)
+    with open(csv_path, "a", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=list(row.keys()))
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow(row)
 
 random.seed(SEED)
 np.random.seed(SEED)
@@ -738,7 +754,8 @@ def train(
             optimizer, mode="min", factor=0.5, patience=7, min_lr=1e-6
         )
 
-    ckpt_path = Path(args.checkpoint) / args.dataset / args.loss/args.model / "best.pt"
+    iteration = getattr(args, "iteration", 0)
+    ckpt_path = Path(args.checkpoint) / args.dataset / args.loss / args.model / f"iter{iteration}" / "best.pt"
     ckpt_path.parent.mkdir(parents=True, exist_ok=True)
 
     best_val_loss  = float("inf")
@@ -888,15 +905,19 @@ def plot_training_curves(history: dict, out_dir: str) -> None:
 # 6.  Main
 # =============================================================================
 
-def main(args) -> None:
+def main(args) -> dict:
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     random.seed(args.seed)
 
-    # Output directory — suffix with _pos_enc when positional encoding is on
+    iteration = getattr(args, "iteration", 0)
+
+    # Output directory — suffix with _pos_enc when positional encoding is on,
+    # then iter{N} so repeats never overwrite each other's plots/history.
     out_dir = Path(args.out_dir) / args.dataset / args.model
     if args.use_pos_encoding and args.model == "transformer":
         out_dir = Path(str(out_dir) + "_pos_enc")
+    out_dir = out_dir / f"iter{iteration}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     config_path = out_dir / "run_config.json"
@@ -958,6 +979,25 @@ def main(args) -> None:
     )
 
     log.info("All outputs saved to %s", out_dir)
+
+    # ── Log this run to the master results CSV ─────────────────────────────
+    ckpt_path = Path(args.checkpoint) / args.dataset / args.loss / args.model / f"iter{iteration}" / "best.pt"
+    row = {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "dataset": args.dataset,
+        "model": args.model,
+        "loss": args.loss,
+        "use_pos_encoding": args.use_pos_encoding,
+        "iteration": iteration,
+        "seed": args.seed,
+        **val_metrics.to_dict(),
+        "ckpt_path": str(ckpt_path),
+        "out_dir": str(out_dir),
+    }
+    append_metrics_row(METRICS_CSV, row)
+    log.info("Logged metrics row to %s", METRICS_CSV)
+
+    return row
 
 
 # =============================================================================
@@ -1029,5 +1069,7 @@ if __name__ == "__main__":
     parser.add_argument("--save_by", choices=["loss", "acc", "prec", "f1", "fbeta", "auroc"], default="loss")
     parser.add_argument("--seed",         type=int,   default=SEED)
     parser.add_argument('--beta',         type=float, default=0.35, help="Beta value for FbetaLoss and Fbeta metric.")
+    parser.add_argument("--iteration",    type=int,   default=0,
+                        help="Repeat number (0 for a standalone run). Only affects output paths and the iteration column in the results CSV.")
 
     main(parser.parse_args())

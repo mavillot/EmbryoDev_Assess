@@ -6,8 +6,8 @@
 
 # PATHS to things
 
-PATH_DATASET='/data/mvillota/Datasets/Datasets/Processed/'
-PATH_MODELS='models/'
+PATH_DATASET='/data/mvillota/EmbryoDev/Datasets/Processed/'
+PATH_MODELS='/data/mvillota/EmbryoDev/models/'
 TMP_PATH = 'tmp/'
 OUTPUT_PATH = 'output/'
 SEED = 42

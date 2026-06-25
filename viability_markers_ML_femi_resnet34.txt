@@ -1,0 +1,12 @@
+nohup: ignoring input
+17:08:32 | INFO     | [1/5] RUN  iter=1 seed=42
+17:08:33 | INFO     | 
+======================================================================
+Aggregation strategy: mean
+======================================================================
+Loading features from: /data/mvillota/EmbryoDev/Datasets/Processed/Oslo_viability/femi
+Found 360 train files
+Found 91 test files
+Train samples: 288
+Val samples:   72
+Test samples:  91

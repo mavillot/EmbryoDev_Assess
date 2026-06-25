@@ -1,0 +1,17 @@
+Voting_soft_DecisionTree+LogisticRegression
+
+Accuracy : 0.5465
+Precision: 0.5686
+Recall   : 0.6304
+F1       : 0.5979
+Fbeta(0.5): 0.5800
+AUROC    : 0.5707
+
+              precision    recall  f1-score   support
+
+   Aneuploid       0.51      0.45      0.48        40
+     Euploid       0.57      0.63      0.60        46
+
+    accuracy                           0.55        86
+   macro avg       0.54      0.54      0.54        86
+weighted avg       0.54      0.55      0.54        86
