@@ -51,13 +51,14 @@ class VideoDataset(Dataset):
     #     self.df          = df
     #     self.augment     = augment
 
-    def __init__(self, video_files, labels, video_dir, df, frame_w, frame_h, n_frames, augment=True, oversample=False, factor_clase_1=3, factor_clase_0=1.5):
+    def __init__(self, video_files, labels, video_dir, df, frame_w, frame_h, n_frames, augment=True, oversample=False, factor_clase_1=3, factor_clase_0=1.5, tabular_lookup=None):
         self.video_dir   = video_dir
         self.df          = df
         self.augment     = augment
         self.n_frames    = n_frames
         self.frame_w     = frame_w
         self.frame_h     = frame_h
+        self.tabular_lookup = tabular_lookup
         if oversample:
             # Listas vacías para construir nuestro dataset balanceado y expandido
             final_video_files = []
@@ -89,8 +90,7 @@ class VideoDataset(Dataset):
         label    = self.labels[idx]
 
         # Temporal sampling augmentation: only for positive class (label==1)
-        # Rationale: heartbeat clips have meaningful temporal structure to sample;
-        # negative clips are mostly static so random windows add little value.
+
         if self.augment and label == 1:
             start_time = random.choice(self.START_TIMES)
             frequency  = random.choice(self.FREQUENCIES)
@@ -109,6 +109,11 @@ class VideoDataset(Dataset):
 
         mask_t  = torch.tensor(mask,  dtype=torch.bool)
         label_t = torch.tensor(label, dtype=torch.long)
+
+        if self.tabular_lookup is not None:
+            tab = self.tabular_lookup[filename]
+            tab = torch.tensor(tab, dtype=torch.float32)
+            return frames_t, mask_t, tab, label_t
         return frames_t, mask_t, label_t
 
     def _augment(self, frames: torch.Tensor) -> torch.Tensor:
@@ -217,15 +222,22 @@ def mixup_collate(batch, alpha=0.4):
     Drop-in replacement for the default DataLoader collate_fn.
     Applies mixup across the batch with Beta(alpha, alpha) mixing coefficient.
 
-    Each item in `batch` is (frames, mask, label) from VideoDataset.__getitem__.
+    Each item in `batch` is (frames, mask, label) from VideoDataset.__getitem__. or (frames, mask, tabular, label) if tabular features are used.
 
     Returns
     -------
     frames_mixed : (B, C, T, H, W)  float32
     mask_mixed   : (B, T)           bool   — union of both masks (conservative)
+    tabular      : (B, D)           float32 — unchanged tabular features
     labels_mixed : (B,)             float32 — soft labels for BCEWithLogitsLoss
     """
-    frames, masks, labels = zip(*batch)
+    if len(batch[0]) == 3:
+        tab = False
+        frames, masks, labels = zip(*batch)
+    else:
+        tab = True
+        frames, masks, tabular, labels = zip(*batch)
+        tabular = torch.stack(tabular)  # (B, D)
 
     frames = torch.stack(frames)          # (B, C, T, H, W)
     masks  = torch.stack(masks)           # (B, T)
@@ -245,7 +257,10 @@ def mixup_collate(batch, alpha=0.4):
     # Soft label: interpolate between the two hard labels
     labels_mixed = lam * labels + (1 - lam) * labels[idx_b]
 
-    return frames_mixed, masks_mixed, labels_mixed
+    if tab:
+        return frames_mixed, masks_mixed, tabular, labels_mixed
+    else:
+        return frames_mixed, masks_mixed, labels_mixed
 
 
 def get_dataloaders(video_dir, excel_path, frame_w=112, frame_h=112, n_frames=30, augment=True, oversample=False, factor1=2, factor0=1.5, batch_size=8, num_workers=4,  device="cuda"):

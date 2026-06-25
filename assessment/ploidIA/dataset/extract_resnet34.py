@@ -1,9 +1,19 @@
 """
 extract_resnet34.py — extract ResNet-34 penultimate-layer features per video.
 
+Frame sampling matches EmbryoVideo (embryo_video.py) and extract_femi.py:
+evenly spaced indices 0, step, 2*step, ... where step = n_total // n_frames,
+read directly via cv2.VideoCapture (no metadata/Excel dependency).
+
+Folder layout expected under --video_dir (mirrors extract_femi.py):
+    <video_dir>/train/FHB/*.mp4
+    <video_dir>/train/no_FHB/*.mp4
+    <video_dir>/test/FHB/*.mp4
+    <video_dir>/test/no_FHB/*.mp4
+
 Output layout
 -------------
-<PATH_DST>/resnet34/
+<out_dir>/
     extraction_config.json
     train/
         FHB/     <video_filename>.pt
@@ -17,7 +27,7 @@ Each .pt file contains:
         "embeddings": FloatTensor (T, 512),
         "mask":       LongTensor  (T,)      1 = valid frame, 0 = blank
         "video_file": str,
-        "label":      int,
+        "label":      int,   # 1 = FHB, 0 = no_FHB
         "n_valid":    int,
     }
 
@@ -29,24 +39,28 @@ Usage
 
 import argparse
 import json
-import sys
+import logging
+import os,sys
 from pathlib import Path
 
+import cv2
 import numpy as np
 import torch
 from tqdm import tqdm
 from torchvision import transforms
 
-# ── shared helpers ────────────────────────────────────────────────────────────
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from assessment.vIAbility.data.data_utils import (
-    PATH_DST, PATH_EXCEL,
-    DEFAULT_N_FRAMES, DEFAULT_START_TIME, DEFAULT_FREQ, DEFAULT_FRAME_SIZE,
-    get_logger, load_split, load_metadata, extract_frames,
-    make_split_dirs, out_path,
-)
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+from config.config import PATH_DATASET
 
-log = get_logger(__name__)
+PATH_PROCESSED = Path(PATH_DATASET) / 'Quiron_ploidy'
+
+# ── logging ────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger(__name__)
 
 # ── ImageNet normalisation ────────────────────────────────────────────────────
 _PREPROCESS = transforms.Compose([
@@ -56,16 +70,54 @@ _PREPROCESS = transforms.Compose([
                          std =[0.229, 0.224, 0.225]),
 ])
 
-RESNET34_DST = PATH_DST / "resnet34"
+# Class label mapping inferred from folder name (mirrors Euploid / Aneuploid dirs)
+LABEL_MAP = {"Euploid": 1, "Aneuploid": 0}
 
-# ── default model path ────────────────────────────────────────────────────────
 DEFAULT_MODEL_PATH = "models/markers/stage_classif/resnet34/resnet34_we15_e100.pth"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Frame loading — same sampling pattern as EmbryoVideo / extract_femi.py
+# ─────────────────────────────────────────────────────────────────────────────
+def load_frames(video_path: str, max_frames: int, frame_size: int, n_total: int,) -> tuple[list[np.ndarray], list[int]]:
+    """
+    Sample `max_frames` evenly across the first `n_total` frames of the video,
+    matching the sampling pattern used by EmbryoVideo (embryo_video.py) and
+    extract_femi.py: indices 0, step, 2*step, ... where
+    step = max(1, n_total // max_frames).
+
+    Returns
+    -------
+    frames : list of (H, W, 3) uint8 RGB arrays — blank if unavailable
+    mask   : list of int  1 = real frame,  0 = padded blank
+    """
+    frames, mask = [], []
+    blank = np.zeros((frame_size, frame_size, 3), dtype=np.uint8)
+
+    step = max(1, n_total // max_frames)
+
+    cap = cv2.VideoCapture(video_path)
+    for i in range(max_frames):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, i * step)
+        ret, img = cap.read()
+        if not ret:
+            break
+        img = cv2.resize(img, (frame_size, frame_size),interpolation=cv2.INTER_LINEAR)
+        img = img[..., ::-1].copy()  # BGR -> RGB
+        frames.append(img)
+        mask.append(1)
+
+    if len(frames) < max_frames:
+        frames.extend([blank.copy()] * (max_frames - len(frames)))
+        mask.extend([0] * (max_frames - len(mask)))
+
+    cap.release()
+    return frames, mask
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Model loading
 # ─────────────────────────────────────────────────────────────────────────────
-
 def load_resnet34(model_path: str, device: str) -> torch.nn.Module:
     """
     Load a saved ResNet-34, strip the final FC layer, and set eval mode.
@@ -83,13 +135,7 @@ def load_resnet34(model_path: str, device: str) -> torch.nn.Module:
 # ─────────────────────────────────────────────────────────────────────────────
 # Core inference
 # ─────────────────────────────────────────────────────────────────────────────
-
-def extract_features_batched(
-    frames,
-    model: torch.nn.Module,
-    device: str,
-    batch_size: int,
-) -> torch.Tensor:
+def extract_features_batched(frames, model: torch.nn.Module, device: str, batch_size: int,) -> torch.Tensor:
     """
     Run ResNet-34 in mini-batches and return (T, 512) feature tensor.
 
@@ -106,7 +152,8 @@ def extract_features_batched(
             feats = model(batch).squeeze(-1).squeeze(-1)   # (B, 512)
             all_features.append(feats.cpu())
             del batch, feats
-            torch.cuda.empty_cache()
+            if device.startswith("cuda"):
+                torch.cuda.empty_cache()
 
     return torch.cat(all_features, dim=0)   # (T, 512)
 
@@ -114,23 +161,24 @@ def extract_features_batched(
 # ─────────────────────────────────────────────────────────────────────────────
 # Per-split extraction loop
 # ─────────────────────────────────────────────────────────────────────────────
-
-def run_split(
-    split: str,
-    filenames: list[str],
-    labels: list[int],
-    metadata_df,
-    model: torch.nn.Module,
-    args: argparse.Namespace,
-) -> tuple[int, int, int]:
+def run_split(split: str, video_dir: Path, out_dir: Path, model: torch.nn.Module, args: argparse.Namespace,) -> tuple[int, int, int]:
     """Extract and save ResNet-34 features for one split. Returns (done, skipped, errors)."""
     done = skipped = errors = 0
 
-    log.info("── %s  (%d videos) ──────────────────────────────────────", split.upper(), len(filenames))
+    video_files = []
+    for class_name, label in LABEL_MAP.items():
+        class_dir = video_dir / split / class_name
+        log.info("Scanning %s …", class_dir)
+        for ext in ("*.mp4", "*.avi"):
+            for vf in sorted(class_dir.glob(ext)):
+                video_files.append((vf, class_name, label))
 
-    for video_file, label in tqdm(zip(filenames, labels), total=len(filenames),
-                                  desc=f"ResNet34 {split}", unit="video"):
-        dst = out_path(RESNET34_DST, split, label, video_file, ".pt")
+    log.info("── %s  (%d videos) ──────────────────────────────────────", split.upper(), len(video_files))
+
+    for video_file, class_name, label in tqdm(video_files, desc=f"ResNet34 {split}", unit="video"):
+        dst_dir = out_dir / split / class_name
+        os.makedirs(dst_dir, exist_ok=True)
+        dst = dst_dir / f"{video_file.stem}.pt"
 
         if dst.exists() and not args.overwrite:
             skipped += 1
@@ -138,13 +186,11 @@ def run_split(
 
         # ── load frames ───────────────────────────────────────────────────
         try:
-            frames, mask = extract_frames(
-                video_file, metadata_df,
-                start_time=args.start_time,
-                freq=args.frequency,
-                n_frames=args.n_frames,
-                resize=args.frame_size,
-                log=log,
+            frames, mask = load_frames(
+                video_path=str(video_file),
+                max_frames=args.n_frames,
+                frame_size=args.frame_size,
+                n_total=args.n_total,
             )
         except Exception as exc:
             log.error("Frame extraction failed for '%s': %s", video_file, exc)
@@ -172,7 +218,7 @@ def run_split(
             {
                 "embeddings": features,             # (T, 512) float32
                 "mask":       torch.tensor(mask),   # (T,)     int
-                "video_file": video_file,
+                "video_file": str(video_file),
                 "label":      label,
                 "n_valid":    n_valid,
             },
@@ -187,13 +233,17 @@ def run_split(
 # ─────────────────────────────────────────────────────────────────────────────
 # Entry point
 # ─────────────────────────────────────────────────────────────────────────────
-
 def main(args: argparse.Namespace) -> None:
+    video_dir = Path(args.video_dir)
+    out_dir   = Path(args.out_dir)
+
     # ── output dirs ───────────────────────────────────────────────────────
-    make_split_dirs(RESNET34_DST)
+    for split in ("train", "test"):
+        for class_name in LABEL_MAP:
+            os.makedirs(out_dir / split / class_name, exist_ok=True)
 
     # ── save extraction config ────────────────────────────────────────────
-    config_path = RESNET34_DST / "extraction_config.json"
+    config_path = out_dir / "extraction_config.json"
     with open(config_path, "w") as f:
         json.dump(vars(args), f, indent=2)
     log.info("Config saved → %s", config_path)
@@ -201,25 +251,15 @@ def main(args: argparse.Namespace) -> None:
     # ── load model ────────────────────────────────────────────────────────
     model = load_resnet34(args.model_path, args.device)
 
-    # ── load metadata & splits ────────────────────────────────────────────
-    metadata_df = load_metadata(PATH_EXCEL)
-    log.info("Metadata: %d rows.", len(metadata_df))
-
-    X_train, y_train = load_split("train")
-    X_test,  y_test  = load_split("test")
-
     # ── run ───────────────────────────────────────────────────────────────
     total_done = total_skipped = total_errors = 0
-    for split, X, y in [("train", X_train, y_train), ("test", X_test, y_test)]:
-        d, s, e = run_split(split, X, y, metadata_df, model, args)
+    for split in ("train", "test"):
+        d, s, e = run_split(split, video_dir, out_dir, model, args)
         total_done    += d
         total_skipped += s
         total_errors  += e
 
-    log.info(
-        "All done. done=%d  skipped=%d  errors=%d  features → %s",
-        total_done, total_skipped, total_errors, RESNET34_DST,
-    )
+    log.info("All done. done=%d  skipped=%d  errors=%d  features → %s", total_done, total_skipped, total_errors, out_dir,)
 
 
 if __name__ == "__main__":
@@ -227,15 +267,13 @@ if __name__ == "__main__":
         description="Extract ResNet-34 features from embryo videos",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--model_path",   default=DEFAULT_MODEL_PATH,
-                        help="Path to saved ResNet-34 .pth file")
-    parser.add_argument("--n_frames",     type=int,   default=DEFAULT_N_FRAMES)
-    parser.add_argument("--start_time",   type=float, default=DEFAULT_START_TIME)
-    parser.add_argument("--frequency",    type=float, default=DEFAULT_FREQ)
-    parser.add_argument("--frame_size",   type=int,   default=DEFAULT_FRAME_SIZE)
-    parser.add_argument("--batch_frames", type=int,   default=16,
-                        help="Frames per forward pass (reduce if OOM)")
+    parser.add_argument("--video_dir",    default=os.path.join(PATH_PROCESSED, "videos"), help="Root directory containing train/<class>/*.mp4 and test/<class>/*.mp4")
+    parser.add_argument("--out_dir",      default=os.path.join(PATH_PROCESSED, "resnet34"), help="Output directory for .pt feature files")
+    parser.add_argument("--model_path",   default=DEFAULT_MODEL_PATH, help="Path to saved ResNet-34 .pth file")
+    parser.add_argument("--n_frames",     type=int,   default=200, help="Number of frames to extract per video (n_MAX)")
+    parser.add_argument("--n_total",      type=int,   default=1300, help="Total number of source frames to sample across (n_total, matches EmbryoVideo)")
+    parser.add_argument("--frame_size",   type=int,   default=224)
+    parser.add_argument("--batch_frames", type=int,   default=16,help="Frames per forward pass (reduce if OOM)")
     parser.add_argument("--device",       default="cuda" if torch.cuda.is_available() else "cpu")
-    parser.add_argument("--overwrite",    action="store_true",
-                        help="Re-extract even if output file already exists")
+    parser.add_argument("--overwrite",    action="store_true", help="Re-extract even if output file already exists")
     main(parser.parse_args())

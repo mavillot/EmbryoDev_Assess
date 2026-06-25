@@ -1,0 +1,19 @@
+Validation results — r2plus1d_18 (60 frames, iter 1, seed 42)
+======================================================================
+
+                  precision    recall  f1-score   support
+
+No Heartbeat (0)       0.57      0.96      0.72        53
+   Heartbeat (1)       0.00      0.00      0.00        38
+
+        accuracy                           0.56        91
+       macro avg       0.29      0.48      0.36        91
+    weighted avg       0.33      0.56      0.42        91
+
+Overall accuracy        : 0.5604
+F-beta (beta=0.5, class 1): 0.0000
+AUROC                   : 0.5094
+
+Per-class breakdown:
+  No Heartbeat (0)        precision=0.5730  recall=0.9623  f1=0.7183  support=53
+  Heartbeat (1)           precision=0.0000  recall=0.0000  f1=0.0000  support=38

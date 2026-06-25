@@ -5,6 +5,13 @@ This module provides functionality for analyzing embryo development videos,
 including temporal tracking of morphological features, division timing,
 and blastocyst formation detection.
 """
+"""
+Embryo Video Analysis Class
+
+This module provides functionality for analyzing embryo development videos,
+including temporal tracking of morphological features, division timing,
+and blastocyst formation detection.
+"""
 
 import cv2,os, sys
 import numpy as np
@@ -201,13 +208,16 @@ class EmbryoVideo:
         
         if simplify:
             
-            self.video.set(cv2.CAP_PROP_POS_FRAMES, 0)
             with tqdm(total=min(self.n_MAX, self.get_total_frames()),desc="Extracting frames") as pbar:
                 for i in range(self.n_MAX):
+                    # Seek to the target frame for this sample, then read it.
+                    # (Previously this read first and seeked afterward, which
+                    # caused frame 0 to be read twice: once via the initial
+                    # seek-to-0 before the loop, and again on iteration 1
+                    # since iteration 0's seek target was also 0.)
+                    self.video.set(cv2.CAP_PROP_POS_FRAMES, i*self.step)
                     ret, frame = self.video.read() 
                     self.video_frames.append(frame)
-                    #read a specific frame
-                    self.video.set(cv2.CAP_PROP_POS_FRAMES, i*self.step)
                     pbar.update(1)
             return self.video_frames
         
@@ -257,7 +267,12 @@ class EmbryoVideo:
             self.cropped_video_frames = self.get_video_frames()
             return self.cropped_video_frames
         
-        xmin, xmax, ymin, ymax = self.xxyy
+        # Ensure frames are actually loaded before we try to crop them.
+        # get_video_frames(simplify=True) (the default path) never sets
+        # self.xxyy, so we can't rely on it being populated here -- the
+        # loop below computes its own crop coords from frame 0 anyway.
+        if not self.video_frames:
+            self.get_video_frames()
         
         # Adaptive cropping with brightness-based recalibration
         for i, frame in enumerate(tqdm(self.video_frames, desc="Cropping frames")):

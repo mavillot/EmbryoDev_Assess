@@ -79,6 +79,7 @@ def dataset_ploidy(path, idx, split='train', n_frames=50):
         for video_name in tqdm(class_dir.iterdir()):
             cap = cv2.VideoCapture(str(video_name))
             N = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            N = min(N, 1000)  
             frame_idxs = np.linspace(0, N - 1, n_frames).astype(int)
             frames = []
             for idx in frame_idxs:
@@ -209,8 +210,10 @@ def prepare_datasets(path, transformer, split='train', tasks=None, frames=50):
             all_vid_samples.extend(data_fhb)
         if 'ploidy' in tasks_set:
             data_ploidy = dataset_ploidy(path / "Quiron_ploidy/videos", 6, split=split, n_frames=frames)
+            data_ploidy1 = dataset_ploidy(path / "EasyFiv/videos", 10, split=split, n_frames=frames)
             print(f"Ploidy samples: {len(data_ploidy)}")
             all_vid_samples.extend(data_ploidy)
+            all_vid_samples.extend(data_ploidy1)
     else:
         print("Skipping ploidy and fhb datasets (transformer not enabled)")
 

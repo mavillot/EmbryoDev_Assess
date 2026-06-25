@@ -252,7 +252,7 @@ class EmbryoImage:
         try:
             if os.path.exists(cells_file):
                 os.remove(cells_file)
-            detect.run(weights=self.PATH_COUNTING_MODEL, source=self.path, project=path_tmp,name = name, device = 0,save_txt=True)
+            detect.run(weights=self.PATH_COUNTING_MODEL, source=self.path, project=path_tmp,name = name, device = 1,save_txt=True)
                    
             if os.path.exists(cells_file):
                 with open(cells_file, 'r') as f:

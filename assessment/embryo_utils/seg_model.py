@@ -7,13 +7,27 @@ from PIL import Image
 transform_image = transforms.Compose([transforms.ToTensor(),
                                      transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])])
 
-def load_model(checkpoint, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+DEVICE = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+
+_MODEL_CACHE = {}
+
+def load_model(checkpoint, device=DEVICE):
+    cache_key = (str(checkpoint), str(device))
+    if cache_key in _MODEL_CACHE:
+        return _MODEL_CACHE[cache_key]
+
     torch._C._jit_set_profiling_mode(False)
     model = torch.jit.load(checkpoint)
     model = model.to(device)
     model.eval()
+
+    _MODEL_CACHE[cache_key] = model
     return model
 
+
+def clear_model_cache():
+    """Optional helper to free GPU memory by dropping cached models."""
+    _MODEL_CACHE.clear()
 
 
 def predict_mask(img: np.ndarray, checkpoint: str, task:str ,target_size: tuple = (480, 480)) -> np.ndarray:
@@ -21,13 +35,13 @@ def predict_mask(img: np.ndarray, checkpoint: str, task:str ,target_size: tuple 
         # Load and preprocess image
         image=Image.fromarray(img)
         orig_w, orig_h = image.size
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = DEVICE
         
         # Resize for model
         image = transforms.Resize(target_size)(image)
         input_tensor = transform_image(image).unsqueeze(0).to(device)
         
-        #load model
+        #load model (cached after first call per checkpoint)
         model = load_model(checkpoint, device=device)
         # Predict
         with torch.no_grad():
@@ -49,4 +63,3 @@ def predict_mask(img: np.ndarray, checkpoint: str, task:str ,target_size: tuple 
             transforms.Resize((orig_h, orig_w))(Image.fromarray(mask.astype('uint8')))
         )
         return mask_resized
-
