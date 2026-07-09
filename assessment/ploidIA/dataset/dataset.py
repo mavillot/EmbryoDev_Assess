@@ -13,7 +13,7 @@ def build_labels(video_files: list[str]) -> list[int]:
     """Return a label for every video file in *video_files*."""
     labels = []
     for filename in video_files:
-        labels.append(class_map[filename.parent.parent.name])
+        labels.append(class_map[Path(filename).parent.name])
     return labels
 # Kinetics-400 normalization stats
 MEAN = torch.tensor([0.43216, 0.394666, 0.37645]).view(3, 1, 1, 1)
@@ -155,10 +155,11 @@ class VideoDataset(Dataset):
         
         frames, mask = [], []
         cap = cv2.VideoCapture(filename)
-        # 1 frame each 5 minutes --> 12 frames = 1 hour
-        time_window = np.arange(12*start_time, 12*(start_time + self.n_frames * frequency), 12 * frequency)
         try:
-            for t in time_window:
+            # Keep the temporal dimension fixed: sample exactly n_frames positions.
+            # frequency controls the spacing between samples; missing frames are padded.
+            for i in range(self.n_frames):
+                t = int(round(12 * (start_time + i * frequency)))
                 cap.set(cv2.CAP_PROP_POS_FRAMES, t)
                 ret, img = cap.read()
                 if ret:
@@ -223,8 +224,8 @@ def mixup_collate(batch, alpha=0.4):
 
 def get_dataloaders(video_dir, frame_w=112, frame_h=112, n_frames=30, augment=True, oversample=False, factor1=2, factor0=1.5, batch_size=8, num_workers=4,  device="cuda"):
 
-    X_train = glob.glob(os.path.join(video_dir, "train/*/*.avi"))
-    X_test  = glob.glob(os.path.join(video_dir, "test/*/*.avi"))
+    X_train = glob.glob(os.path.join(video_dir, "train/*/*.mp4"))
+    X_test  = glob.glob(os.path.join(video_dir, "test/*/*.mp4"))
     y_train = build_labels(X_train)
     y_test  = build_labels(X_test)
 

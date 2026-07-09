@@ -1,0 +1,19 @@
+Validation results — mvit (16 frames, iter 4, seed 45)
+======================================================================
+
+                  precision    recall  f1-score   support
+
+No Heartbeat (0)       0.46      0.76      0.58        42
+   Heartbeat (1)       0.41      0.16      0.23        44
+
+        accuracy                           0.45        86
+       macro avg       0.44      0.46      0.40        86
+    weighted avg       0.44      0.45      0.40        86
+
+Overall accuracy        : 0.4535
+F-beta (beta=0.5, class 1): 0.3125
+AUROC                   : 0.4848
+
+Per-class breakdown:
+  No Heartbeat (0)        precision=0.4638  recall=0.7619  f1=0.5766  support=42
+  Heartbeat (1)           precision=0.4118  recall=0.1591  f1=0.2295  support=44

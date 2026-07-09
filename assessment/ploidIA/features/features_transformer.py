@@ -82,6 +82,7 @@ log = logging.getLogger(__name__)
 
 BASE_MODELS  = os.path.join(PATH_MODELS,  "assessment/ploidIA")
 BASE_OUTPUT  = "results/assessment/ploidIA"
+METRICS_CSV = os.path.join(BASE_OUTPUT, "experiment_results.csv")
 
 random.seed(SEED)
 np.random.seed(SEED)
@@ -329,7 +330,7 @@ def build_markers_loaders(markers_dir: "str | list[str]", args):
 def build_loaders(args):
     source = args.dataset.lower()
 
-    if source == "both":
+    if source == "combined":
         roots = [os.path.join(PATH_DATASET, 'EasyFiv', args.feat), os.path.join(PATH_DATASET, "Quiron_ploidy", args.feat),]
     else:
         roots = args.data_dir or os.path.join(PATH_DATASET, args.dataset, args.feat)
@@ -494,7 +495,8 @@ def train(
             optimizer, mode="min", factor=0.5, patience=7, min_lr=1e-6
         )
 
-    ckpt_path = Path(args.checkpoint) / args.dataset / args.loss/args.model / "best.pt"
+    iteration = getattr(args, "iteration", 0)
+    ckpt_path = Path(args.checkpoint) / args.dataset / args.loss/args.model/f"iter{iteration}"  / "best.pt"
     ckpt_path.parent.mkdir(parents=True, exist_ok=True)
 
     best_val_loss  = float("inf")
@@ -650,7 +652,7 @@ def main(args) -> None:
     random.seed(args.seed)
 
     # Output directory — suffix with _pos_enc when positional encoding is on
-    out_dir = Path(args.out_dir) / args.dataset /args.feat / args.model
+    out_dir = Path(args.out_dir) / 'features' /args.dataset /args.feat / args.model / args.loss / f"iter{args.iteration}"
     if args.use_pos_encoding and args.model == "transformer":
         out_dir = Path(str(out_dir) + "_pos_enc")
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -728,9 +730,9 @@ if __name__ == "__main__":
 
     # ── Dataset ───────────────────────────────────────────────────────────
     parser.add_argument(
-        "--dataset", default="EasyFiv", choices=["EasyFiv", "Quiron_ploidy", "both"],
+        "--dataset", default="EasyFiv", choices=["EasyFiv", "Quiron_ploidy", "Combined"],
         help=(
-            "Dataset name. Built-in: EasyFiv, Quiron, both. "
+            "Dataset name. Built-in: EasyFiv, Quiron, Combined. "
             "Any name is accepted — just point --data_dir at the right folder."
         ),
     )
@@ -795,5 +797,7 @@ if __name__ == "__main__":
     parser.add_argument("--save_by", choices=["loss", "acc", "prec", "f1", "fbeta", "auroc"], default="loss")
     parser.add_argument("--seed",         type=int,   default=SEED)
     parser.add_argument('--beta',         type=float, default=0.5, help="Beta value for FbetaLoss and Fbeta metric.")
+    parser.add_argument("--iteration",    type=int,   default=0,
+                        help="Repeat number (0 for a standalone run). Only affects output paths and the iteration column in the results CSV.")
 
     main(parser.parse_args())

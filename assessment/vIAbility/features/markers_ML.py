@@ -49,8 +49,21 @@ CV_SCORING = {
     "recall": make_scorer(recall_score, pos_label=1, zero_division=0),
     "fbeta": make_scorer(fbeta_score, beta=0.5, pos_label=1, zero_division=0),
     "f1": make_scorer(f1_score, pos_label=1, zero_division=0),
-    "auroc": make_scorer(roc_auc_score, response_method="predict_proba"),
+    "auroc": None,
 }
+
+
+def _auroc_scorer(estimator, X, y):
+    if hasattr(estimator, "predict_proba"):
+        scores = estimator.predict_proba(X)[:, 1]
+    elif hasattr(estimator, "decision_function"):
+        scores = estimator.decision_function(X)
+    else:
+        raise AttributeError(f"{estimator.__class__.__name__} has neither predict_proba nor decision_function")
+    return roc_auc_score(y, scores)
+
+
+CV_SCORING["auroc"] = _auroc_scorer
 
 def load_data(path: Path, split: str = "train"):
     files = sorted(glob.glob(str(path / split / "*/*.csv")))
@@ -241,8 +254,10 @@ def main(args):
     
     best_models = {n: CLASSIFIERS[n](**best_params[n]).fit(X_final_train, y_final_train) for n in CLASSIFIERS}
     bagging_models = {n: clf.fit(X_final_train, y_final_train) for n, clf in build_bagging_classifiers(best_params, seed).items()}
-    voting_configs = search_voting_combinations(best_params, X_train_cl, y_train, X_val_cl, y_val, min_size=args.vote_min, max_size=args.vote_max, voting=args.voting, top_k=args.vote_top_k)
-    final_voting_models = {n: VotingClassifier(estimators=cfg["estimators"], voting=cfg["strategy"], n_jobs=-1).fit(X_final_train, y_final_train) for n, cfg in voting_configs.items()}
+    final_voting_models = {}
+    if args.voting != "none":
+        voting_configs = search_voting_combinations(best_params, X_train_cl, y_train, X_val_cl, y_val, min_size=args.vote_min, max_size=args.vote_max, voting=args.voting, top_k=args.vote_top_k)
+        final_voting_models = {n: VotingClassifier(estimators=cfg["estimators"], voting=cfg["strategy"], n_jobs=-1).fit(X_final_train, y_final_train) for n, cfg in voting_configs.items()}
     
     all_models = {**best_models, **bagging_models, **final_voting_models}
     cv_results = cross_validate_models(all_models, X_train_cl, y_train, n_folds=args.cv_folds, seed=seed)
@@ -270,7 +285,7 @@ if __name__ == "__main__":
     parser.add_argument("--out_dir", default=PATH_OUTPUT)
     parser.add_argument("--vote_min", type=int, default=2)
     parser.add_argument("--vote_max", type=int, default=None)
-    parser.add_argument("--voting", default="both", choices=["hard", "soft", "both"])
+    parser.add_argument("--voting", default="both", choices=["hard", "soft", "both", "none"])
     parser.add_argument("--vote_top_k", type=int, default=3)
     parser.add_argument("--cv_folds", type=int, default=CV_FOLDS)
     parser.add_argument("--val_size", type=float, default=VAL_SIZE)

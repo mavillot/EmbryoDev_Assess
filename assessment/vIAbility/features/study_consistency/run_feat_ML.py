@@ -106,7 +106,7 @@ def run_all(cli_args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Repeat features_ML.py's pipeline N=5 times with different seeds")
-    parser.add_argument("--dataset", type=str, default="femi")
+    parser.add_argument("--dataset", type=str, default="resnet34")
     parser.add_argument("--strategies", nargs="+", default=["mean", "mean_std", "4stat", "weighted_mean", "pos_encoding"])
     parser.add_argument("--use-pca", action="store_true")
     parser.add_argument("--pca-components", type=int, default=64)

@@ -87,7 +87,7 @@ BASE_MODELS  = os.path.join(PATH_MODELS,  "assessment/vIAbility")
 BASE_OUTPUT  = "results/assessment/vIAbility/features/"
 
 # Master CSV — one row per run, across every dataset/model/iteration combo.
-METRICS_CSV = os.path.join(BASE_OUTPUT, "experiment_results.csv")
+METRICS_CSV = os.path.join(BASE_OUTPUT, "experiment_results_fbeta.csv")
 
 
 def append_metrics_row(csv_path: str, row: dict) -> None:
@@ -914,7 +914,7 @@ def main(args) -> dict:
 
     # Output directory — suffix with _pos_enc when positional encoding is on,
     # then iter{N} so repeats never overwrite each other's plots/history.
-    out_dir = Path(args.out_dir) / args.dataset / args.model
+    out_dir = Path(args.out_dir) / args.dataset / args.loss /args.model
     if args.use_pos_encoding and args.model == "transformer":
         out_dir = Path(str(out_dir) + "_pos_enc")
     out_dir = out_dir / f"iter{iteration}"

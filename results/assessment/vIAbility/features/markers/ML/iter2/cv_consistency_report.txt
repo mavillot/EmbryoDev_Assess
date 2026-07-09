@@ -11,6 +11,14 @@ RandomForest
   f1         CV=33.98% ± 9.82% | TEST=51.52% | ⚠ optimistic
   auroc      CV=47.62% ± 9.01% | TEST=61.34% | ⚠ optimistic
 
+SVC
+  accuracy   CV=51.66% ± 9.25% | TEST=57.14% | ✓ consistent
+  precision  CV=16.14% ± 19.77% | TEST=0.00% | ✓ consistent
+  recall     CV=40.00% ± 48.99% | TEST=0.00% | ✓ consistent
+  fbeta      CV=18.33% ± 22.45% | TEST=0.00% | ✓ consistent
+  f1         CV=23.00% ± 28.17% | TEST=0.00% | ✓ consistent
+  auroc      CV=46.93% ± 9.41% | TEST=58.38% | ✓ consistent
+
 GaussianNB
   accuracy   CV=51.03% ± 4.99% | TEST=59.34% | ⚠ optimistic
   precision  CV=34.68% ± 10.60% | TEST=57.14% | ⚠ optimistic
@@ -106,27 +114,3 @@ Bagging_TabPFN
   fbeta      CV=16.03% ± 11.86% | TEST=9.09% | ✓ consistent
   f1         CV=9.69% ± 8.58% | TEST=4.65% | ✓ consistent
   auroc      CV=48.72% ± 8.56% | TEST=59.81% | ✓ consistent
-
-Voting_soft_MLPClassifier+TabPFN
-  accuracy   CV=53.44% ± 6.60% | TEST=57.14% | ✓ consistent
-  precision  CV=23.49% ± 19.93% | TEST=0.00% | ✓ consistent
-  recall     CV=16.52% ± 14.13% | TEST=0.00% | ✓ consistent
-  fbeta      CV=21.15% ± 17.53% | TEST=0.00% | ✓ consistent
-  f1         CV=18.78% ± 15.41% | TEST=0.00% | ✓ consistent
-  auroc      CV=49.12% ± 8.51% | TEST=63.86% | ⚠ optimistic
-
-Voting_soft_RandomForest+SVC+DecisionTree+LogisticRegression
-  accuracy   CV=54.53% ± 8.55% | TEST=50.55% | ✓ consistent
-  precision  CV=42.41% ± 11.74% | TEST=42.86% | ✓ consistent
-  recall     CV=41.81% ± 17.05% | TEST=46.15% | ✓ consistent
-  fbeta      CV=42.07% ± 12.65% | TEST=43.48% | ✓ consistent
-  f1         CV=41.77% ± 14.17% | TEST=44.44% | ✓ consistent
-  auroc      CV=50.74% ± 10.54% | TEST=54.09% | ✓ consistent
-
-Voting_soft_RandomForest+SVC+DecisionTree+MLPClassifier+LogisticRegression+TabPFN
-  accuracy   CV=54.88% ± 7.96% | TEST=49.45% | ✓ consistent
-  precision  CV=42.61% ± 11.29% | TEST=41.03% | ✓ consistent
-  recall     CV=39.28% ± 15.27% | TEST=41.03% | ✓ consistent
-  fbeta      CV=41.73% ± 12.06% | TEST=41.03% | ✓ consistent
-  f1         CV=40.63% ± 13.25% | TEST=41.03% | ✓ consistent
-  auroc      CV=50.79% ± 11.43% | TEST=55.37% | ✓ consistent

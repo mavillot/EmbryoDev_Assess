@@ -1,0 +1,14 @@
+RandomForest                                       acc=0.5465 prec=0.5556 rec=0.7609 f1=0.6422 fbeta=0.5872 auroc=0.5543
+SVC                                                acc=0.5581 prec=0.5870 rec=0.5870 f1=0.5870 fbeta=0.5870 auroc=0.6277
+GaussianNB                                         acc=0.5930 prec=0.5873 rec=0.8043 f1=0.6789 fbeta=0.6208 auroc=0.5826
+DecisionTree                                       acc=0.5581 prec=0.5714 rec=0.6957 f1=0.6275 fbeta=0.5926 auroc=0.5753
+MLPClassifier                                      acc=0.5116 prec=0.5294 rec=0.7826 f1=0.6316 fbeta=0.5660 auroc=0.4516
+LogisticRegression                                 acc=0.5349 prec=0.5500 rec=0.7174 f1=0.6226 fbeta=0.5769 auroc=0.5783
+TabPFN                                             acc=0.5581 prec=0.5625 rec=0.7826 f1=0.6545 fbeta=0.5960 auroc=0.5777
+Bagging_RandomForest                               acc=0.5349 prec=0.5469 rec=0.7609 f1=0.6364 fbeta=0.5795 auroc=0.5870
+Bagging_SVC                                        acc=0.5465 prec=0.5778 rec=0.5652 f1=0.5714 fbeta=0.5752 auroc=0.5905
+Bagging_GaussianNB                                 acc=0.5698 prec=0.5738 rec=0.7609 f1=0.6542 fbeta=0.6034 auroc=0.5799
+Bagging_DecisionTree                               acc=0.5349 prec=0.5517 rec=0.6957 f1=0.6154 fbeta=0.5755 auroc=0.5370
+Bagging_MLPClassifier                              acc=0.5465 prec=0.5522 rec=0.8043 f1=0.6549 fbeta=0.5892 auroc=0.5114
+Bagging_LogisticRegression                         acc=0.5814 prec=0.5833 rec=0.7609 f1=0.6604 fbeta=0.6119 auroc=0.6011
+Bagging_TabPFN                                     acc=0.5349 prec=0.5517 rec=0.6957 f1=0.6154 fbeta=0.5755 auroc=0.5560

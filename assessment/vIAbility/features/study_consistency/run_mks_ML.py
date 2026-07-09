@@ -28,7 +28,7 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent))
-from assessment.vIAbility.features.markers_ML import main, METRICS_CSV, SEED, PATH_MODELS, PATH_OUTPUT
+from assessment.vIAbility.features.markers_ML import main, METRICS_CSV, SEED, PATH_MODELS, PATH_OUTPUT, CLASSIFIERS
 
 log = logging.getLogger(__name__)
 logging.basicConfig(
@@ -41,16 +41,39 @@ N_REPEATS = 5
 SEEDS = [SEED + i for i in range(N_REPEATS)]
 
 
+def _min_expected_rows_per_iteration() -> int:
+    # Base + bagging are always produced; voting models may be zero depending on config.
+    return 2 * len(CLASSIFIERS)
+
+
+def _load_iteration_rows(existing: pd.DataFrame, iteration: int, seed: int) -> pd.DataFrame:
+    rows = existing[existing["iteration"] == iteration].copy()
+    if "seed" in rows.columns:
+        rows = rows[rows["seed"] == seed].copy()
+    if rows.empty:
+        return rows
+
+    # If duplicates exist for the same model in one iteration, keep the latest by timestamp.
+    if "timestamp" in rows.columns and "model" in rows.columns:
+        rows = rows.sort_values("timestamp").drop_duplicates(subset=["model"], keep="last")
+    return rows
+
+
 def run_all(cli_args):
     all_dfs = []
+    min_expected = _min_expected_rows_per_iteration()
 
     for i, seed in enumerate(SEEDS, start=1):
         if os.path.exists(METRICS_CSV):
             existing = pd.read_csv(METRICS_CSV)
-            if "iteration" in existing.columns and (existing["iteration"] == i).any():
-                log.info("[%d/%d] SKIP iter=%d  (already in %s)", i, N_REPEATS, i, METRICS_CSV)
-                all_dfs.append(existing[existing["iteration"] == i])
-                continue
+            if "iteration" in existing.columns:
+                cached_rows = _load_iteration_rows(existing, i, seed)
+                if len(cached_rows) >= min_expected:
+                    log.info("[%d/%d] SKIP iter=%d seed=%d  (reusing %d rows from %s)", i, N_REPEATS, i, seed, len(cached_rows), METRICS_CSV)
+                    all_dfs.append(cached_rows)
+                    continue
+                if not cached_rows.empty:
+                    log.info("[%d/%d] RE-RUN iter=%d seed=%d  (found only %d/%d cached rows)", i, N_REPEATS, i, seed, len(cached_rows), min_expected)
 
         log.info("[%d/%d] RUN  iter=%d seed=%d", i, N_REPEATS, i, seed)
         run_args = argparse.Namespace(
@@ -95,6 +118,10 @@ def run_all(cli_args):
     sort_col = "test_fbeta_mean" if "test_fbeta_mean" in summary.columns else summary.columns[0]
     summary = summary.reset_index().sort_values(sort_col, ascending=False)
 
+    summary_csv = os.path.join(out_root, "repeats_summary.csv")
+    summary.to_csv(summary_csv, index=False)
+    log.info("Summary CSV written to %s", summary_csv)
+
     summary_xlsx = os.path.join(out_root, "repeats_summary.xlsx")
     with pd.ExcelWriter(summary_xlsx, engine="openpyxl") as writer:
         combined.sort_values(["model", "iteration"]).to_excel(writer, sheet_name="all_repeats", index=False)
@@ -111,7 +138,7 @@ if __name__ == "__main__":
     parser.add_argument("--out_dir", default=str(PATH_OUTPUT))
     parser.add_argument("--vote_min", type=int, default=2)
     parser.add_argument("--vote_max", type=int, default=None)
-    parser.add_argument("--voting", default="both", choices=["hard", "soft", "both"])
+    parser.add_argument("--voting", default="none", choices=["hard", "soft", "both", "none"])
     parser.add_argument("--vote_top_k", type=int, default=3)
     parser.add_argument("--cv_folds", type=int, default=5)
     parser.add_argument("--val_size", type=float, default=0.2)

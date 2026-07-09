@@ -33,7 +33,7 @@ import logging
 import os
 from argparse import Namespace
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent))
-from assessment.vIAbility.features.features_transformer import main, METRICS_CSV, SEED, BASE_MODELS, BASE_OUTPUT
+from assessment.ploidIA.features.features_transformer import main, METRICS_CSV, SEED, BASE_MODELS, BASE_OUTPUT
 
 
 log = logging.getLogger(__name__)
@@ -46,15 +46,17 @@ logging.basicConfig(
 N_REPEATS = 5
 SEEDS = [SEED + i for i in range(N_REPEATS)]
 
-DATASETS = ["femi", "markers", "resnet34"]
+DATASETS = ["Combined"]
+FEATURES = ["markers"]
 PLAIN_MODELS = ["rnn", "gru", "lstm"]
 
 # (model, use_pos_encoding) pairs — pos-encoding only meaningful for transformer
 MODEL_VARIANTS = [(m, False) for m in PLAIN_MODELS] + [("transformer", False), ("transformer", True)]
 
 EXPERIMENTS = [
-    (dataset, model, pos_enc)
+    (dataset, feature, model, pos_enc)
     for dataset in DATASETS
+    for feature in FEATURES
     for model, pos_enc in MODEL_VARIANTS
 ]
 
@@ -62,9 +64,10 @@ BASE_ARGS = dict(
     data_dir=None,
     checkpoint=str(BASE_MODELS),
     out_dir=str(BASE_OUTPUT),
-    weight_loss=False,
-    loss="ce",
+    weight_loss=True,
+    loss="fbeta",
     dropout=0.2,
+    n_frames= 50,
     d_model=32, num_heads=4, ff_dim=64,
     hidden1=32, hidden2=16, fc_dim=16,
     epochs=200, batch_size=32, lr=1e-3, weight_decay=1e-4,
@@ -75,18 +78,19 @@ BASE_ARGS = dict(
 )
 
 
-def tag(dataset, model, pos_enc):
+def tag(dataset,feature, model, pos_enc):
     suffix = "_pos_enc" if (pos_enc and model == "transformer") else ""
-    return f"{dataset}/{model}{suffix}"
+    return f"{dataset}/{feature}/{model}{suffix}"
 
 
-def already_done(dataset: str, model: str, pos_enc: bool, iteration: int) -> bool:
+def already_done(dataset: str, feature: str, model: str, pos_enc: bool, iteration: int) -> bool:
     if not os.path.exists(METRICS_CSV):
         return False
     with open(METRICS_CSV, newline="") as fh:
         for row in csv.DictReader(fh):
             if (
                 row.get("dataset") == dataset
+                and row.get("feature") == feature
                 and row.get("model") == model
                 and str(row.get("use_pos_encoding")) == str(pos_enc)
                 and row.get("iteration") not in (None, "")
@@ -100,19 +104,19 @@ def run_all():
     total = len(EXPERIMENTS) * N_REPEATS
     done = 0
 
-    for dataset, model, pos_enc in EXPERIMENTS:
+    for dataset, feature, model, pos_enc in EXPERIMENTS:
         for i, seed in enumerate(SEEDS, start=1):
             done += 1
-            label = tag(dataset, model, pos_enc)
+            label = tag(dataset, feature, model, pos_enc)
 
-            if already_done(dataset, model, pos_enc, i):
+            if already_done(dataset, feature, model, pos_enc, i):
                 log.info("[%2d/%2d] SKIP  %-22s iter=%d  (already logged)", done, total, label, i)
                 continue
 
             log.info("[%2d/%2d] START %-22s iter=%d seed=%d", done, total, label, i, seed)
 
             args = Namespace(
-                dataset=dataset, model=model, use_pos_encoding=pos_enc,
+                dataset=dataset,feat = feature, model=model, use_pos_encoding=pos_enc,
                 iteration=i, seed=seed, **BASE_ARGS,
             )
             try:

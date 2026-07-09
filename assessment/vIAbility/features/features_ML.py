@@ -35,6 +35,21 @@ CLASSIFIERS = {"RandomForest": RandomForestClassifier, "SVC": SVC, "GaussianNB":
 AGGREGATORS = {"mean": aggregate_mean, "mean_std": aggregate_mean_std, "4stat": aggregate_4stat,"concat_pca": aggregate_concat_pca, 
                "weighted_mean": aggregate_weighted_mean, "pos_encoding": aggregate_pos_encoding}
 
+
+def _auroc_scores(clf, X):
+    if hasattr(clf, "predict_proba"):
+        return clf.predict_proba(X)[:, 1]
+    if hasattr(clf, "decision_function"):
+        return clf.decision_function(X)
+    return None
+
+
+def _auroc_scorer(estimator, X, y):
+    scores = _auroc_scores(estimator, X)
+    if scores is None:
+        scores = estimator.predict(X)
+    return roc_auc_score(y, scores)
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Dataset
 # ──────────────────────────────────────────────────────────────────────────────
@@ -108,7 +123,7 @@ def evaluate_validation(clf, X_train, y_train, X_val, y_val, cv_folds=5, seed=SE
         scoring={
             "accuracy": "accuracy", "precision": "precision", "recall": "recall",
             "fbeta": make_scorer(fbeta_score, beta=0.5, pos_label=1, zero_division=0),
-            "auroc": make_scorer(roc_auc_score, response_method="predict_proba"),
+            "auroc": _auroc_scorer,
         }
     )
     metrics = {}
@@ -123,20 +138,20 @@ def evaluate_validation(clf, X_train, y_train, X_val, y_val, cv_folds=5, seed=SE
         "precision": precision_score(y_val, preds, average="binary", zero_division=0),
         "recall": recall_score(y_val, preds, average="binary", zero_division=0),
         "fbeta": fbeta_score(y_val, preds, beta=0.5, average="binary", zero_division=0),
-        "auroc": roc_auc_score(y_val, clf.predict_proba(X_val)[:, 1] if hasattr(clf, "predict_proba") else preds),
+        "auroc": roc_auc_score(y_val, _auroc_scores(clf, X_val) if _auroc_scores(clf, X_val) is not None else preds),
         "predictions": preds
     })
     return metrics
 
 def evaluate_test_set(clf, X_test, y_test):
     preds = clf.predict(X_test)
-    proba = clf.predict_proba(X_test)[:, 1] if hasattr(clf, "predict_proba") else preds
+    proba = _auroc_scores(clf, X_test)
     return {
         "test_accuracy": accuracy_score(y_test, preds),
         "test_precision": precision_score(y_test, preds, average="binary", zero_division=0),
         "test_recall": recall_score(y_test, preds, average="binary", zero_division=0),
         "test_fbeta": fbeta_score(y_test, preds, beta=0.5, average="binary", zero_division=0),
-        "test_auroc": roc_auc_score(y_test, proba),
+        "test_auroc": roc_auc_score(y_test, proba if proba is not None else preds),
         "predictions": preds,
     }
 

@@ -45,7 +45,7 @@ from sklearn.metrics import (
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 from assessment.ploidIA.dataset.dataset import get_dataloaders, mixup_collate
 from assessment.vIAbility.models.video import MViTClassifier, R2Plus1DClassifier
-from config.config import PATH_DATASET, SEED
+from config.config import PATH_DATASET, SEED, PATH_MODELS
 
 
 VIDEO_DIR = os.path.join(PATH_DATASET, "EasyFiv/videos")
@@ -74,7 +74,7 @@ class TrainConfig:
     frame_w: int        = 112
     n_frames: int       = 16        # temporal depth (TIME_WINDOW length)
     num_workers: int    = 4
-    backbone: str       = "mvit"   # "r2plus1d_18" or "mvit"
+    backbone: str       = "r2plus1d_18"   # "r2plus1d_18" or "mvit"
 
     # ── Repetition bookkeeping ────────────────────────────────────────────
     # iteration: 1-indexed repeat number (used only for naming ckpts/outputs
@@ -117,7 +117,7 @@ class TrainConfig:
     factor0 = 1.5
 
     # checkpointing
-    ckpt_dir: str       = "models/assessment/ploidIA/3d_cnn/"
+    ckpt_dir: str       = PATH_MODELS+"/assessment/ploidIA/3d_cnn/"
     ckpt_name: str      = field(init=False)
 
     # evaluation outputs
@@ -292,7 +292,9 @@ def train(cfg: Optional[TrainConfig] = None):
         device      = device,
     )
     train_loader.dataset.video_files.extend(train_loader1.dataset.video_files)
+    train_loader.dataset.labels.extend(train_loader1.dataset.labels)
     val_loader.dataset.video_files.extend(val_loader1.dataset.video_files)
+    val_loader.dataset.labels.extend(val_loader1.dataset.labels)
     log.info("Train: %d  |  Val: %d", len(train_loader.dataset), len(val_loader.dataset))
 
     # ── Model ─────────────────────────────────────────────────────────────────

@@ -11,6 +11,14 @@ RandomForest
   f1         CV=27.84% ± 8.09% | TEST=37.14% | ✓ consistent
   auroc      CV=46.31% ± 5.52% | TEST=51.73% | ✓ consistent
 
+SVC
+  accuracy   CV=54.18% ± 4.71% | TEST=52.75% | ✓ consistent
+  precision  CV=40.69% ± 9.22% | TEST=41.67% | ✓ consistent
+  recall     CV=23.95% ± 5.93% | TEST=25.64% | ✓ consistent
+  fbeta      CV=35.21% ± 6.78% | TEST=37.04% | ✓ consistent
+  f1         CV=29.68% ± 5.68% | TEST=31.75% | ✓ consistent
+  auroc      CV=46.60% ± 7.21% | TEST=53.75% | ✓ consistent
+
 GaussianNB
   accuracy   CV=55.90% ± 2.76% | TEST=60.44% | ⚠ optimistic
   precision  CV=43.98% ± 6.11% | TEST=57.14% | ⚠ optimistic
@@ -106,27 +114,3 @@ Bagging_TabPFN
   fbeta      CV=15.61% ± 8.53% | TEST=19.61% | ✓ consistent
   f1         CV=8.75% ± 5.18% | TEST=9.52% | ✓ consistent
   auroc      CV=48.78% ± 7.71% | TEST=51.13% | ✓ consistent
-
-Voting_soft_DecisionTree+MLPClassifier+TabPFN
-  accuracy   CV=54.19% ± 4.63% | TEST=50.55% | ✓ consistent
-  precision  CV=41.29% ± 6.47% | TEST=37.50% | ✓ consistent
-  recall     CV=34.31% ± 11.88% | TEST=23.08% | ✓ consistent
-  fbeta      CV=39.35% ± 7.78% | TEST=33.33% | ✓ consistent
-  f1         CV=37.08% ± 9.58% | TEST=28.57% | ✓ consistent
-  auroc      CV=48.72% ± 6.76% | TEST=44.63% | ✓ consistent
-
-Voting_soft_RandomForest+DecisionTree+MLPClassifier
-  accuracy   CV=50.03% ± 4.38% | TEST=45.05% | ✓ consistent
-  precision  CV=38.44% ± 5.79% | TEST=36.59% | ✓ consistent
-  recall     CV=42.93% ± 14.71% | TEST=38.46% | ✓ consistent
-  fbeta      CV=39.07% ± 7.16% | TEST=36.95% | ✓ consistent
-  f1         CV=40.23% ± 9.55% | TEST=37.50% | ✓ consistent
-  auroc      CV=46.94% ± 6.95% | TEST=45.46% | ✓ consistent
-
-Voting_soft_SVC+DecisionTree+MLPClassifier+TabPFN
-  accuracy   CV=54.86% ± 2.91% | TEST=51.65% | ✓ consistent
-  precision  CV=40.78% ± 5.44% | TEST=35.29% | ✓ consistent
-  recall     CV=24.86% ± 5.95% | TEST=15.38% | ⚠ pessimistic
-  fbeta      CV=35.90% ± 5.16% | TEST=28.04% | ⚠ pessimistic
-  f1         CV=30.63% ± 5.44% | TEST=21.43% | ⚠ pessimistic
-  auroc      CV=48.58% ± 5.95% | TEST=44.63% | ✓ consistent

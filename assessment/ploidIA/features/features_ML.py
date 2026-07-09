@@ -57,6 +57,14 @@ CLASSIFIERS = {
     "TabPFN": TabPFNClassifier,
 }
 
+
+def _auroc_scores(clf, X):
+    if hasattr(clf, "predict_proba"):
+        return clf.predict_proba(X)[:, 1]
+    if hasattr(clf, "decision_function"):
+        return clf.decision_function(X)
+    return None
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Dataset
 # ──────────────────────────────────────────────────────────────────────────────
@@ -210,7 +218,7 @@ class RunResult:
     test_auroc: float = 0.0
 
 
-def evaluate_validation(clf, X_train, y_train, X_val, y_val, cv_folds=5):
+def evaluate_validation(clf, X_train, y_train, X_val, y_val, cv_folds=5, cv_seed=SEED):
 
     clf.fit(X_train, y_train)
 
@@ -218,7 +226,7 @@ def evaluate_validation(clf, X_train, y_train, X_val, y_val, cv_folds=5):
 
     cv_results = cross_validate(
         clf, X_train, y_train,
-        cv=StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=SEED),
+        cv=StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=cv_seed),
         scoring={
             "accuracy": "accuracy",
             "precision": "precision",
@@ -246,8 +254,8 @@ def evaluate_validation(clf, X_train, y_train, X_val, y_val, cv_folds=5):
     metrics["f1"] = f1_score(y_val, preds, average="binary", zero_division=0)
     metrics["fbeta"] = fbeta_score(y_val, preds, beta=0.5, average="binary", zero_division=0)
 
-    proba = clf.predict_proba(X_val)[:, 1] if hasattr(clf, "predict_proba") else preds
-    metrics["auroc"] = roc_auc_score(y_val, proba)
+    scores = _auroc_scores(clf, X_val)
+    metrics["auroc"] = roc_auc_score(y_val, scores) if scores is not None else roc_auc_score(y_val, preds)
 
     metrics["predictions"] = preds
 
@@ -257,7 +265,7 @@ def evaluate_validation(clf, X_train, y_train, X_val, y_val, cv_folds=5):
 def evaluate_test_set(clf, X_test, y_test):
 
     preds = clf.predict(X_test)
-    proba = clf.predict_proba(X_test)[:, 1] if hasattr(clf, "predict_proba") else preds
+    proba = _auroc_scores(clf, X_test)
 
     return {
         "test_accuracy": accuracy_score(y_test, preds),
@@ -265,7 +273,7 @@ def evaluate_test_set(clf, X_test, y_test):
         "test_recall": recall_score(y_test, preds, average="binary", zero_division=0),
         "test_f1": f1_score(y_test, preds, average="binary", zero_division=0),
         "test_fbeta": fbeta_score(y_test, preds, beta=0.5, average="binary", zero_division=0),
-        "test_auroc": roc_auc_score(y_test, proba),
+        "test_auroc": roc_auc_score(y_test, proba) if proba is not None else roc_auc_score(y_test, preds),
         "predictions": preds,
     }
 
@@ -344,7 +352,7 @@ def _save_confusion_matrix(y_true, y_pred, output_dir, model_name, strategy):
 # Main experiments
 # ──────────────────────────────────────────────────────────────────────────────
 
-def run_experiments(X_train_tensors, mask_train, y_train, X_validation_tensors, mask_validation, y_validation, X_test_tensors, mask_test, y_test, strategies=("mean", "mean_std", "4stat"), classifiers=None, param_grid=None, use_scaling=True, use_pca=False, pca_components=64, cv_folds=5, output_dir="output/assessment/ploidIA/ML"):
+def run_experiments(X_train_tensors, mask_train, y_train, X_validation_tensors, mask_validation, y_validation, X_test_tensors, mask_test, y_test, strategies=("mean", "mean_std", "4stat"), classifiers=None, param_grid=None, use_scaling=True, use_pca=False, pca_components=64, cv_folds=5, seed=SEED, output_dir="output/assessment/ploidIA/ML"):
 
     if classifiers is None:
         classifiers = list(CLASSIFIERS.keys())
@@ -405,7 +413,7 @@ def run_experiments(X_train_tensors, mask_train, y_train, X_validation_tensors, 
 
                     clf = clf_cls(**params)
 
-                    metrics = evaluate_validation(clf, X_tr, y_train, X_vl, y_validation, cv_folds)
+                    metrics = evaluate_validation(clf, X_tr, y_train, X_vl, y_validation, cv_folds, cv_seed=seed)
 
                     result = RunResult(
                         classifier=clf_name, strategy=strategy, params=params,
@@ -587,7 +595,12 @@ def main(args):
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    if args.dataset == 'both':
+    run_seed = getattr(args, "seed", SEED)
+    random.seed(run_seed)
+    np.random.seed(run_seed)
+    torch.manual_seed(run_seed)
+
+    if args.dataset == 'Combined':
 
         datasets = ['EasyFiv', 'Quiron_ploidy']
 
@@ -615,7 +628,7 @@ def main(args):
         (X_full, mask_full, y_full), (X_test, mask_test, y_test) = build_datasets(PATH_DATASET + f"{args.dataset}/{args.feat}")
 
     indices = np.arange(len(y_full))
-    train_idx, val_idx = train_test_split(indices, test_size=0.2, stratify=y_full.numpy(), random_state=SEED)
+    train_idx, val_idx = train_test_split(indices, test_size=0.2, stratify=y_full.numpy(), random_state=run_seed)
 
     X_tr = X_full[train_idx]
     mask_tr = mask_full[train_idx]
@@ -633,11 +646,17 @@ def main(args):
     X_vl_list, mask_vl_list = tensors_to_lists(X_vl, mask_vl)
     X_test_list, mask_test_list = tensors_to_lists(X_test, mask_test)
 
+    base_output_dir = f"results/assessment/ploidIA/{args.dataset}/{args.feat}/ML"
+    iteration = getattr(args, "iteration", None)
+    if iteration is not None:
+        base_output_dir = os.path.join(base_output_dir, f"iter{iteration}")
+
     df = run_experiments(X_tr_list, mask_tr_list, y_tr.numpy(), X_vl_list, mask_vl_list, y_vl.numpy(), X_test_list, mask_test_list, y_test.numpy(),
                          strategies=args.strategies, use_scaling=True, use_pca=args.use_pca, pca_components=args.pca_components, cv_folds=5,
-                         output_dir=f"results/assessment/ploidIA/{args.dataset}/{args.feat}/ML")
+                         seed=run_seed, output_dir=base_output_dir)
 
     print(df.sort_values("test_fbeta", ascending=False).to_string())
+    return df
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Entry point

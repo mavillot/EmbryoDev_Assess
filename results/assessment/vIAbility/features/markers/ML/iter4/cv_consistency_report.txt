@@ -11,6 +11,14 @@ RandomForest
   f1         CV=28.88% ± 10.05% | TEST=37.68% | ✓ consistent
   auroc      CV=44.71% ± 4.61% | TEST=53.60% | ⚠ optimistic
 
+SVC
+  accuracy   CV=50.28% ± 8.32% | TEST=57.14% | ✓ consistent
+  precision  CV=23.28% ± 19.09% | TEST=0.00% | ✓ consistent
+  recall     CV=44.35% ± 46.13% | TEST=0.00% | ✓ consistent
+  fbeta      CV=24.66% ± 20.79% | TEST=0.00% | ✓ consistent
+  f1         CV=28.41% ± 25.72% | TEST=0.00% | ✓ consistent
+  auroc      CV=46.89% ± 7.36% | TEST=50.94% | ✓ consistent
+
 GaussianNB
   accuracy   CV=54.54% ± 4.17% | TEST=57.14% | ✓ consistent
   precision  CV=43.57% ± 5.37% | TEST=50.00% | ✓ consistent
@@ -106,27 +114,3 @@ Bagging_TabPFN
   fbeta      CV=12.48% ± 1.89% | TEST=18.18% | ⚠ optimistic
   f1         CV=7.21% ± 0.34% | TEST=9.30% | ⚠ optimistic
   auroc      CV=43.41% ± 5.07% | TEST=57.99% | ⚠ optimistic
-
-Voting_soft_SVC+MLPClassifier
-  accuracy   CV=49.00% ± 8.49% | TEST=58.24% | ✓ consistent
-  precision  CV=38.80% ± 7.75% | TEST=50.94% | ⚠ optimistic
-  recall     CV=41.92% ± 10.55% | TEST=69.23% | ⚠ optimistic
-  fbeta      CV=39.14% ± 7.63% | TEST=53.78% | ⚠ optimistic
-  f1         CV=39.86% ± 7.93% | TEST=58.70% | ⚠ optimistic
-  auroc      CV=46.98% ± 6.00% | TEST=56.61% | ⚠ optimistic
-
-Voting_soft_MLPClassifier+TabPFN
-  accuracy   CV=51.42% ± 6.07% | TEST=58.24% | ✓ consistent
-  precision  CV=37.19% ± 7.52% | TEST=51.72% | ⚠ optimistic
-  recall     CV=28.33% ± 13.35% | TEST=38.46% | ✓ consistent
-  fbeta      CV=33.07% ± 9.31% | TEST=48.39% | ⚠ optimistic
-  f1         CV=30.46% ± 11.70% | TEST=44.12% | ✓ consistent
-  auroc      CV=45.70% ± 6.83% | TEST=61.88% | ⚠ optimistic
-
-Voting_soft_RandomForest+SVC+DecisionTree+TabPFN
-  accuracy   CV=53.81% ± 3.64% | TEST=48.35% | ✓ consistent
-  precision  CV=42.10% ± 6.86% | TEST=40.48% | ✓ consistent
-  recall     CV=40.87% ± 10.42% | TEST=43.59% | ✓ consistent
-  fbeta      CV=41.70% ± 7.65% | TEST=41.06% | ✓ consistent
-  f1         CV=41.27% ± 8.75% | TEST=41.98% | ✓ consistent
-  auroc      CV=48.60% ± 5.26% | TEST=52.17% | ✓ consistent
