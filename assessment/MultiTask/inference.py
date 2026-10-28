@@ -1,3 +1,5 @@
+"""Inference entry point for MultiTask models on image/video inputs."""
+
 import pandas as pd 
 import torch
 import sys
@@ -62,7 +64,8 @@ class MultiTaskInference:
         device: str = 'cuda',
         multi_gpu: bool = False,
         batch_size: int = 8,
-        use_transformer: bool = True
+        use_transformer: bool = True,
+        n_frames: int = 16,
     ):
         """
         Initialize inference engine.
@@ -74,6 +77,7 @@ class MultiTaskInference:
             multi_gpu: Whether to use multiple GPUs
             batch_size: Batch size for inference
             use_transformer: Whether to enable transformer for video processing
+            n_frames: Number of frames expected by the temporal transformer
         """
         self.encoder = encoder
         self.checkpoint_path = checkpoint_path
@@ -81,6 +85,7 @@ class MultiTaskInference:
         self.multi_gpu = multi_gpu and torch.cuda.device_count() > 1
         self.batch_size = batch_size
         self.use_transformer = use_transformer
+        self.n_frames = n_frames
         
         # Initialize model
         self.model = self._load_model()
@@ -97,16 +102,16 @@ class MultiTaskInference:
         start_time = time.time()
         """Load model from checkpoint."""
         # Initialize model architecture
-        if args.encoder == "resnet34":
+        if self.encoder == "resnet34":
             encoder = ResNetEncoder(pretrained=False)
-        elif args.encoder == "efficientnet_b3":
+        elif self.encoder == "efficientnet_b3":
             encoder = EfficientNetB3Encoder(pretrained=False)
         else:
-            raise ValueError(f"Unknown encoder: {args.encoder}")
+            raise ValueError(f"Unknown encoder: {self.encoder}")
         
         # Conditionally initialize transformer
         if self.use_transformer:
-            transformer = VideoTransformer(args.n_frames)
+            transformer = VideoTransformer(self.n_frames)
             print("Transformer enabled for video processing")
         else:
             transformer = None
@@ -608,7 +613,8 @@ def main(args):
         device='cuda' if torch.cuda.is_available() else 'cpu',
         multi_gpu=args.multi_gpu,
         batch_size=args.batch_size,
-        use_transformer=args.transformer
+        use_transformer=args.transformer,
+        n_frames=args.n_frames,
     )
     
     all_results = []

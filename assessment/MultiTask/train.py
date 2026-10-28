@@ -1,3 +1,5 @@
+"""Training entry point for the MultiTask embryo assessment model."""
+
 import torch
 import sys, tqdm
 import argparse

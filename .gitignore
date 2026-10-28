@@ -1,9 +1,13 @@
-# Modelos entrenados
+# Existing project paths
 models/
 logs/
 Notebooks/
 tmp/
 output/
+results/
+tabfm/
+
+# Legacy project-specific ignores kept from existing repository
 assessment/ploidIA/dataset/extract_femi.py
 assessment/vIAbility/data/antiguo/extract_FEMI_features_antiguo.py
 markers/stage_classification/data/femi_prep.py
@@ -11,6 +15,62 @@ assessment/embryo_utils/other
 assessment/ploidIA/models_antiguo
 assessment/vIAbility/video_classif
 Notebooks/images_tesis.ipynb
-results/
 create_excel_results.py
-tabfm
+
+# Python cache/bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Build/test/tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Packaging artifacts
+build/
+dist/
+*.egg-info/
+
+# Local data/checkpoints/outputs
+data/
+datasets/
+checkpoints/
+wandb/
+mlruns/
+*.pt
+*.pth
+*.ckpt
+
+# Logs and temp
+*.log
+*.tmp
+*.temp
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Secrets/config
+.env
+.env.*
+*.pem
+*.key

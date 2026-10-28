@@ -1,152 +1,157 @@
-# 🧫 Embryo Development Assessment 🧫
+# EmbryoDev_Assess
 
-EmbryoDev Assess is a research-oriented repository for embryo assessment pipelines.
+Research codebase for automated embryo assessment experiments from time-lapse imaging and derived features.
 
-This README documents the source code that is part of the tracked project structure and focuses on the multi-task deep learning workflow under `assessment/MultiTask`.
-This respository is thought as repository where all the assessments task will be included in the assessment (e.g. future viability prediction)
+> **Research use only (non-clinical).**
+> This repository is intended for research, reproducibility, and method development. It is **not** validated for clinical use, diagnosis, treatment decisions, or regulatory use.
 
-## Repository Scope
+## Project purpose and scope
 
-Main documented modules:
+This repository consolidates multiple embryo assessment workflows, including:
 
-- `assessment/MultiTask`: multi-task training, evaluation, inference, dataset loading, augmentations, and model definitions.
-- `config`: shared paths and constants used by scripts.
+- **Multi-task embryo assessment** (joint segmentation/classification/video branch) in `assessment/MultiTask/`
+- **Ploidy workflows** in `assessment/ploidIA/`
+- **Viability workflows** in `assessment/vIAbility/`
+- **Marker-specific workflows** (grading, segmentation, fragmentation, cell count, stage, quality) in `markers/`
+- Shared embryo utilities in `assessment/embryo_utils/`
 
-## 🗂️ Project Structure
+The codebase contains both actively maintained paths and legacy/experimental scripts. The MultiTask path is the primary documented end-to-end pipeline.
+
+## Repository structure
 
 ```text
 .
-├── README.md
 ├── assessment/
-│   └── MultiTask/
-│       ├── train.py
-│       ├── eval.py
-│       ├── inference.py
-│       ├── data/
-│       │   ├── augmentation.py
-│       │   ├── dataset.py
-│       │   └── managment.py
-│       └── models/
-│           ├── multi_task.py
-│           ├── encoder/
-│           │   └── visual_encoder.py
-│           ├── heads/
-│           │   ├── classification.py
-│           │   └── segmentation.py
-│           └── temporal/
-│               └── temporal_transformer.py
-└── config/
-		├── __init__.py
-		└── config.py
+│   ├── MultiTask/           # primary multi-task training/eval/inference scripts
+│   ├── embryo_utils/        # reusable embryo image/video utility code
+│   ├── ploidIA/             # ploidy-oriented workflows
+│   └── vIAbility/           # viability-oriented workflows
+├── markers/                 # marker-specific modeling/evaluation workflows
+├── config/                  # shared configuration values
+├── docs/                    # lightweight documentation for public use
+├── environment.yml          # conda environment definition
+├── LICENSE                  # MIT license
+└── README.md
 ```
 
-## 🔍 What The MultiTask Pipeline Predicts
-A single model, multiple tasks 🚀
+## Multi-task architecture/workflow overview
 
-The multi-task model combines image-based and optional video-based outputs:
+`assessment/MultiTask` scripts orchestrate a shared multi-head model pipeline:
 
-### Segmentation 
-- Blastocyst structure segmentation (`blasto_str`)
-- Fragmentation segmentation (`fragmentation`)
-### Classification
-- Morphological grading classification (`exp`, `icm`, `te`)
-### Temporal 🎥
-- Ploidy classification from video (`ploidy`, when transformer/video branch is enabled)
+1. **Dataset assembly** from configured dataset root (`config/config.py`)
+2. **Task selection** (`--tasks`) and optional temporal branch (`--transformer`)
+3. **Staged training** in `train.py` (frozen encoder, optional progressive unfreezing phases)
+4. **Evaluation** in `eval.py` with per-task metrics
+5. **Inference** in `inference.py` for image and/or video inputs
+6. **Consistency studies** with repeated runs (`consistency.py`, `consistency_eval.py`)
 
-## ⚙️ Configuration
+## Environment setup
 
-Global paths and constants are defined in `config/config.py`.
-
-🔑 Important keys:
-
-- `PATH_DATASET`: base dataset directory (default: `../Datasets/Processed/`)
-- `OUTPUT_PATH`: folder used by evaluation/inference outputs
-- `TMP_PATH`: temporary files folder
-- label value maps and image-size defaults
-
-⚠️ Update these values before running experiments in a new environment.
-
-## 🚀 Quick Start
-
-### 1️⃣ Environment
-
-Use Python 3.10+ and install the common dependencies used across scripts:
+Use the existing Conda environment file:
 
 ```bash
-pip install torch torchvision numpy pandas opencv-python matplotlib seaborn scikit-learn pillow tqdm
+conda env create -f environment.yml
+conda activate viability3d
 ```
 
-### 2️⃣ Training 🏋️‍♂️
+### GPU/CUDA notes
 
-From the repository root:
+- `environment.yml` is configured for **PyTorch + CUDA 11.8** (`pytorch-cuda=11.8`).
+- Ensure your NVIDIA driver is compatible.
+- If your system uses a different CUDA stack, adapt `environment.yml` accordingly before creating the environment.
+
+### CPU-only note
+
+- CPU-only execution is possible for many scripts, but substantially slower.
+- Some workloads may still assume CUDA availability unless script flags are set to CPU.
+
+## Data, checkpoints, and privacy responsibilities
+
+- **Datasets and model checkpoints are not included.**
+- You must provide your own data in the expected folder structures used by each workflow.
+- You are responsible for dataset licensing, consent/privacy compliance, and secure handling of sensitive medical data.
+- Do not commit private datasets, patient-identifiable metadata, checkpoints, or generated predictions to this repository.
+
+## Reproducible CLI commands (verified against argparse interfaces)
+
+From repository root:
+
+### MultiTask training
 
 ```bash
 python assessment/MultiTask/train.py \
-	--encoder resnet34 \
-	--device cuda \
-	--batch_size 4 \
-	--transformer
+  --encoder resnet34 \
+  --device cuda \
+  --batch_size 4
 ```
 
-Useful optional flags:
-
-- `--multi_gpu`: enables multiGPU
-- `--weighted_loss`: class-loss weighting
-- `--data_augmentation`: enable augmentation pipeline
-- `--path_model`: output/checkpoint directory
-- `--baseline`: run a baseline model mode
-
-### 3️⃣ Evaluation 📊
+### MultiTask evaluation
 
 ```bash
 python assessment/MultiTask/eval.py \
-	--path ../Datasets/Processed/ \
-	--checkpoint /path/to/checkpoint.pth \
-	--encoder resnet34 \
+  --checkpoint /path/to/checkpoint.pth \
+  --encoder resnet34
 ```
 
-Useful optional flags:
-
-- `--batch_size`
-- `--multi_gpu`
-- `--transformer`
-- `--output_dir`
-
-### 4️⃣ Inference 🔮
+### MultiTask inference (images)
 
 ```bash
 python assessment/MultiTask/inference.py \
-	--input_images /path/to/images_or_image \
-	--checkpoint /path/to/checkpoint.pth \
-	--encoder resnet34
+  --checkpoint /path/to/checkpoint.pth \
+  --input_images /path/to/image_or_dir \
+  --encoder resnet34
 ```
 
-🎥 For video inference, provide `--input_videos` and enable `--transformer`.
+### MultiTask consistency runs
 
-Additional options:
+```bash
+python assessment/MultiTask/consistency.py --encoder resnet34
+python assessment/MultiTask/consistency_eval.py --runs_dir /path/to/consistency_output
+```
 
-- `--batch_size`
-- `--image_size`
-- `--n_frames`
-- `--multi_gpu`
-- `--output_dir`
-- `--diagnose --diagnose_n 4` (BatchNorm train/eval gap diagnosis)
+### Additional major workflow entry points
 
-## Data Notes
+```bash
+python assessment/vIAbility/eval.py --ckpt /path/to/checkpoint.pt
+python assessment/vIAbility/inference.py /path/to/video.mp4
+python markers/evaluate_multitask.py --path /path/to/dataset --checkpoint /path/to/checkpoint.pth
+```
 
-The training/evaluation scripts use dataset management utilities in `assessment/MultiTask/data/managment.py` and custom samplers/collate logic in `assessment/MultiTask/data/dataset.py`.
+> Note: successful execution also depends on external data layout and some model modules/assets that are not packaged in this repository clone.
 
-To avoid runtime path issues:
+## Configuration
 
-- keep dataset folder structure consistent with what `prepare_datasets` expects
-- validate that `PATH_DATASET` points to the correct root before launching runs
+Shared defaults live in `config/config.py` and can be overridden with environment variables:
 
-## Reproducibility
+- `EMBRYODEV_DATASET_PATH`
+- `EMBRYODEV_MODELS_PATH`
+- `EMBRYODEV_TMP_PATH`
+- `EMBRYODEV_OUTPUT_PATH`
 
-- Seed defaults are configured in `config/config.py`.
-- Keep experiment arguments and checkpoints logged per run.
-- Prefer fixed train/val/test splits when comparing model variants.
+## Known limitations
 
-## Current Focus
+- Several scripts rely on local data conventions that are not fully standardized across all subprojects.
+- Some workflows reference optional pretrained assets not bundled in the repository.
+- Legacy/experimental folders are kept for research traceability and may require additional setup.
 
-The maintained, documented code path in this repository is the multi-task embryo assessment workflow under `assessment/MultiTask`.
+## Troubleshooting (concise)
+
+- **Import/path errors (`ModuleNotFoundError`)**: run from repository root and verify project-relative imports.
+- **CUDA errors**: confirm driver/CUDA compatibility with your installed PyTorch build.
+- **Missing checkpoints/data**: provide valid paths and ensure expected split/file naming conventions.
+- **Out-of-memory**: reduce batch size/frames and use CPU mode if necessary.
+
+## Citation and reuse
+
+If you use this repository in academic work, please cite your corresponding paper/project and reference this repository URL and commit hash.
+A starter citation file is provided in `CITATION.cff` and should be updated with publication metadata when available.
+
+## Contributing and issues
+
+- See `CONTRIBUTING.md` for contribution workflow.
+- Use GitHub Issues to report bugs, reproducibility blockers, or documentation gaps.
+- For security-sensitive disclosures, see `SECURITY.md`.
+
+## License
+
+MIT License (see `LICENSE`).

@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+title: EmbryoDev_Assess
+message: "If you use this repository, please cite it using the metadata below."
+type: software
+authors:
+  - family-names: "Villota"
+    given-names: "Miguel"
+repository-code: "https://github.com/mavillot/EmbryoDev_Assess"
+license: MIT
