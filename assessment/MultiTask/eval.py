@@ -1,3 +1,5 @@
+"""Evaluation entry point for MultiTask checkpoints."""
+
 import torch
 import sys
 import cv2
