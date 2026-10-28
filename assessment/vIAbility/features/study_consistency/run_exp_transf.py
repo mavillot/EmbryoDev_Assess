@@ -46,7 +46,7 @@ logging.basicConfig(
 N_REPEATS = 5
 SEEDS = [SEED + i for i in range(N_REPEATS)]
 
-DATASETS = ["femi", "markers", "resnet34"]
+DATASETS = ["femi"]
 PLAIN_MODELS = ["rnn", "gru", "lstm"]
 
 # (model, use_pos_encoding) pairs — pos-encoding only meaningful for transformer
@@ -63,7 +63,7 @@ BASE_ARGS = dict(
     checkpoint=str(BASE_MODELS),
     out_dir=str(BASE_OUTPUT),
     weight_loss=True,
-    loss="fbeta",
+    loss="ce",
     dropout=0.2,
     d_model=32, num_heads=4, ff_dim=64,
     hidden1=32, hidden2=16, fc_dim=16,

@@ -10,6 +10,7 @@ import torch.nn as nn
 from typing import Optional, List, Dict, Tuple
 from tqdm import tqdm
 from PIL import Image
+import time
 
 from models.multi_task import MultiTaskModel
 from models.encoder.visual_encoder import ResNetEncoder, EfficientNetB3Encoder
@@ -93,6 +94,7 @@ class MultiTaskInference:
         print(f"  Transformer enabled: {self.use_transformer}")
     
     def _load_model(self) -> nn.Module:
+        start_time = time.time()
         """Load model from checkpoint."""
         # Initialize model architecture
         if args.encoder == "resnet34":
@@ -104,7 +106,7 @@ class MultiTaskInference:
         
         # Conditionally initialize transformer
         if self.use_transformer:
-            transformer = VideoTransformer()
+            transformer = VideoTransformer(args.n_frames)
             print("Transformer enabled for video processing")
         else:
             transformer = None
@@ -123,6 +125,8 @@ class MultiTaskInference:
                 new_state_dict[name] = v
             checkpoint = new_state_dict
         
+        checkpoint = {k: v for k, v in checkpoint.items() if not k.endswith("loss_fn.pos_weight")}
+
         model.load_state_dict(checkpoint)
         model.to(self.device)
         
@@ -133,6 +137,8 @@ class MultiTaskInference:
         
         model.eval()
         print(f"Model loaded from {self.checkpoint_path}")
+        end_time = time.time()
+        print(f"Checkpoint loaded in {end_time - start_time:.6f} seconds")
         
         return model
     
@@ -149,7 +155,7 @@ class MultiTaskInference:
             Preprocessed image tensor [C, H, W]
         """
         img = cv2.imread(str(image_path))
-        img = transform_image(img)
+        img = transform_image(img, size)
         return img
     
     @staticmethod
@@ -411,7 +417,6 @@ class MultiTaskInference:
                 3: (0, 0, 255)                  # TE - Red
             }
         }
-        
         # Process in batches
         for i in range(0, len(image_paths), self.batch_size):
             batch_paths = image_paths[i:i + self.batch_size]
@@ -722,7 +727,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--n_frames", 
         type=int, 
-        default=50, 
+        default=16, 
         help="Number of frames to sample from each video"
     )
     parser.add_argument(

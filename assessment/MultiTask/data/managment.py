@@ -73,7 +73,7 @@ def dataset_ploidy(path, idx, split='train', n_frames=50):
     data = []
     # DATASET PLOIDY
     video_root = path  / split
-    class_map ={'Aneuploides':0, 'Euploides':1}
+    class_map ={'Aneuploid':0, 'Euploid':1}
     for class_name in class_map.keys():
         class_dir = video_root / class_name
         for video_name in tqdm(class_dir.iterdir()):

@@ -5,6 +5,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 from matplotlib import pyplot as plt
 import seaborn as sns
+import time
 from sklearn.metrics import (confusion_matrix, classification_report, precision_recall_fscore_support, accuracy_score, fbeta_score,)
 
 def evaluate(model: nn.Module, loader: DataLoader, device: str, out_dir: str, class_names: list, log = None) -> None:
@@ -16,6 +17,7 @@ def evaluate(model: nn.Module, loader: DataLoader, device: str, out_dir: str, cl
     model.eval()
 
     all_labels, all_preds, all_probs = [], [], []
+    start_time = time.time()
     with torch.no_grad():
         for frames, mask, tabular, labels in loader:
             frames  = frames.to(device)
@@ -32,6 +34,8 @@ def evaluate(model: nn.Module, loader: DataLoader, device: str, out_dir: str, cl
 
     y_true = np.array(all_labels, dtype=int)
     y_pred = np.array(all_preds,  dtype=int)
+    end_time = time.time()
+    log.info("Evaluation completed in %.4f seconds", end_time - start_time)
 
     # ── Confusion matrix ──────────────────────────────────────────────────
     cm = confusion_matrix(y_true, y_pred)

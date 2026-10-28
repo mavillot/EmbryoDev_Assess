@@ -21,8 +21,8 @@ from config.config import PATH_DATASET
 
 WEIGHTS_LOSS = {
     'exp':           1.0,
-    'icm':           1.0,
-    'te':            1.0,
+    'icm':           3.0,
+    'te':            3.0,
 
 }
 
@@ -117,8 +117,6 @@ class Trainer:
                 if batch.get(key) is not None:
                     batch[key] = batch[key].to(self.device)
         
-
-                
         return batch
     
     def _compute_loss(self, batch):

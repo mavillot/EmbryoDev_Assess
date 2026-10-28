@@ -10,7 +10,11 @@ from glob import glob
 
 DATA = {'EXP': {'classes': [0, 1, 2, 3, 4], 'class_map':{0:1,1:2,2:3,3:4,4:5} },
         'ICM': {'classes': [0,1,2], 'class_map':{0:'A',1:'B',2:'C'} },
-        'TE':  {'classes': [0,1,2], 'class_map':{0:'A',1:'B',2:'C'} }}
+        'TE':  {'classes': [0,1,2], 'class_map':{0:'A',1:'B',2:'C'} },
+        'STAGE':  {'classes': [i for i in range(7)], 'class_map':{0: "empty", 1:"1cell", 2:"2cell",
+                                                                  3:"+3cell", 4:"+8cell", 5:"morula",
+                                                                  6:"blastocyst" } }}
+
 
 def get_transforms():
     return transforms.Compose([
@@ -35,21 +39,21 @@ def get_image_paths(path):
         raise ValueError(f"Invalid path: {path}")
 
 
-def load_model(checkpoint_path, num_classes, device,  model_name = 'inception_v3'):
-    model = torchvision.models.__dict__[model_name](init_weights=False)
+def load_model(checkpoint_path, num_classes, device, model_name='inception_v3'):
+    loaded = torch.load(checkpoint_path, map_location=device, weights_only=False)
 
-    model.fc = nn.Linear(model.fc.in_features, num_classes)
-
-    # MUST replicate training
-    model.aux_logits = False
-    model.AuxLogits = None
-
-    state_dict = torch.load(checkpoint_path, map_location=device)
-    model.load_state_dict(state_dict)
+    if isinstance(loaded, nn.Module):
+        # checkpoint stored the whole model, not a state_dict
+        model = loaded
+    else:
+        model = torchvision.models.__dict__[model_name](init_weights=False)
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
+        model.aux_logits = False
+        model.AuxLogits = None
+        model.load_state_dict(loaded)
 
     model.to(device)
     model.eval()
-
     return model
 
 

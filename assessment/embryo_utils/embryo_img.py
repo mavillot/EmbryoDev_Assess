@@ -19,7 +19,7 @@ from assessment.embryo_utils.functions import (hull, polar_img, higuchi_fractal_
 
 from markers.cell_count import detect
 from markers.blastocyst_grading.inference import run
-from config.config import SEGMENTATION_VALUES, TMP_PATH
+from config.config import PATH_MODELS, SEGMENTATION_VALUES, TMP_PATH
 
 
 class EmbryoImage:
@@ -42,16 +42,17 @@ class EmbryoImage:
         >>> embryo.draw_prediction("output.png")
     """
     root_dir = '../../'
-    root_dir = ''
+    root_dir = PATH_MODELS
     
     # Class constants for segmentation values
     SEGMENTATION_VALUES['THRESHOLD'] = 145
-    PATH_SEGMENTATION_MODEL = root_dir +'models/markers/blastocyst_segmentation/segmentation_hrnet.pth'
-    PATH_FRAGMENTATION_MODEL = root_dir +'models/markers/fragmentation/fragmentation_hrnet.pth'
-    PATH_COUNTING_MODEL = root_dir +'models/markers/cell_count/best.pt'
-    PATH_EXPANSION_MODEL = root_dir +'models/markers/blastocyst_grading/EXP_0.1754.pt'
-    PATH_TE_MODEL = root_dir +'models/markers/blastocyst_grading/TE_0.8447.pt'
-    PATH_ICM_MODEL = root_dir +'models/markers/blastocyst_grading/ICM_0.6777.pt'
+    PATH_SEGMENTATION_MODEL = root_dir +'/markers/blastocyst_segmentation/segmentation_hrnet.pth'
+    PATH_FRAGMENTATION_MODEL = root_dir +'/markers/fragmentation/fragmentation_hrnet.pth'
+    PATH_COUNTING_MODEL = root_dir +'/markers/cell_count/best.pt'
+    PATH_EXPANSION_MODEL = root_dir +'/markers/blastocyst_grading/EXP_0.1754.pt'
+    PATH_TE_MODEL = root_dir +'/markers/blastocyst_grading/TE_0.8447.pt'
+    PATH_ICM_MODEL = root_dir +'/markers/blastocyst_grading/ICM_0.6777.pt'
+    PATH_STAGE_CLASSIF = root_dir + 'markers/stage_classif/resnet34/resnet34_we15_e100.pth'
     TMP_PATH = root_dir + TMP_PATH+'markers'
 
     # Supported image formats
@@ -124,6 +125,9 @@ class EmbryoImage:
         self.icm_grading: Optional[str] = None
         self.grading: Optional[str] = None
 
+        # Stage classification
+        self.stage_classif: Optional[str] = None    
+
         # Fragmentation
         self.fragmentation: Optional[np.ndarray] = None
         self.fragmentation_idx: Optional[float] = None
@@ -172,10 +176,142 @@ class EmbryoImage:
         else:
             self.cropped_embryo = img
         
-        # Save temporary image
+        # Save temporary image (used by YOLO-based cell counting)
+        tmp_dir = Path(self.TMP_PATH)
+        tmp_dir.mkdir(parents=True, exist_ok=True)
         resized = cv2.resize(self.image, (640, 640), interpolation=cv2.INTER_AREA)
-        cv2.imwrite(self.TMP_PATH+'/original_image.png', resized)
-        self.path = self.TMP_PATH+'/original_image.png'
+        tmp_path = tmp_dir / 'original_image.png'
+        cv2.imwrite(str(tmp_path), resized)
+        self.path = str(tmp_path)
+
+    def get_values(
+        self,
+        *,
+        include_blastocyst_structures: bool = True,
+        include_cell_count: bool = True,
+        include_fragmentation: bool = True,
+        include_grading: bool = True,
+        include_stage: bool = True,
+    ) -> Dict[str, Any]:
+        """Compute metrics with optional expensive components.
+
+        Returns a dict with the same keys as `get_all_values()`, but can skip
+        YOLO cell counting, fragmentation segmentation, and grading/classifiers.
+        """
+        # If blastocyst structures are disabled, skip segmentation-derived metrics entirely.
+        if not include_blastocyst_structures:
+            out: Dict[str, Any] = {
+                'diameter': None,
+                'area': None,
+                'ZP_R': None,
+                'ZP_r': None,
+                'ZP_thickness': None,
+                'ZP_area': None,
+                'ZP_symmetry': None,
+                'TE_area': None,
+                'TE_fractal_d': None,
+                'TE_mean_thickness': None,
+                'TE_area_ratio': None,
+                'ICM_area': None,
+                'ICM_area_ratio': None,
+                'ICM_eccentricity': None,
+                'BC_area': None,
+                'BC_area_ratio': None,
+                'n_cells': None,
+                'cleavage': None,
+                'fragmentation_idx': None,
+                'expansion': None,
+                'te_grading': None,
+                'icm_grading': None,
+                'grading': None,
+                'stage_classif': None,
+            }
+
+            if include_cell_count:
+                out['n_cells'] = self.get_number_of_cells()
+                out['cleavage'] = self.get_cleavage()
+            if include_fragmentation:
+                out['fragmentation_idx'] = self.get_fragmentation_idx()
+            if include_grading:
+                out['expansion'], out['te_grading'], out['icm_grading'] = self.get_grading()
+            if include_stage:
+                out['stage_classif'] = self.get_stage_classification()
+
+            return out
+
+        # Check if segmentation is valid
+        if len(np.unique(self.get_blasto_seg())) == 1:
+            return {
+                'diameter': 0,
+                'area': 0,
+                'ZP_R': 0,
+                'ZP_r': 0,
+                'ZP_thickness': 0,
+                'ZP_area': 0,
+                'ZP_symmetry': 0,
+                'TE_area': 0,
+                'TE_fractal_d': 0,
+                'TE_mean_thickness': 0,
+                'TE_area_ratio': 0,
+                'ICM_area': 0,
+                'ICM_area_ratio': 0,
+                'ICM_eccentricity': 0,
+                'BC_area': 0,
+                'BC_area_ratio': 0,
+                'n_cells': 0 if include_cell_count else None,
+                'cleavage': None,
+                'fragmentation_idx': 0 if include_fragmentation else None,
+                'expansion': None,
+                'te_grading': None,
+                'icm_grading': None,
+                'grading': None,
+                'stage_classif': None,
+            }
+
+        # Compute core metrics
+        zp_r, zp_r_inner = self.get_ZP_R_r()
+        out: Dict[str, Any] = {
+            'diameter': self.get_diameter(),
+            'area': self.get_area(),
+            'ZP_R': zp_r,
+            'ZP_r': zp_r_inner,
+            'ZP_thickness': self.get_ZP_thickness(),
+            'ZP_area': self.get_ZP_area(),
+            'ZP_symmetry': self.get_ZP_symmetry(),
+            'TE_area': self.get_TE_area(),
+            'TE_fractal_d': self.get_TE_fractal_d(),
+            'TE_mean_thickness': np.mean(self.TE_thickness) if self.TE_thickness is not None else 0,
+            'TE_area_ratio': self.get_TE_area_ratio(),
+            'ICM_area': self.get_ICM_area(),
+            'ICM_area_ratio': self.get_ICM_area_ratio(),
+            'ICM_eccentricity': self.get_ICM_eccentricity(),
+            'BC_area': self.get_BC_area(),
+            'BC_area_ratio': self.get_BC_area_ratio(),
+            # Optional parts (filled below)
+            'n_cells': None,
+            'cleavage': None,
+            'fragmentation_idx': None,
+            'expansion': None,
+            'te_grading': None,
+            'icm_grading': None,
+            'grading': None,
+            'stage_classif': None,
+        }
+
+        if include_cell_count:
+            out['n_cells'] = self.get_number_of_cells()
+            out['cleavage'] = self.get_cleavage()
+
+        if include_fragmentation:
+            out['fragmentation_idx'] = self.get_fragmentation_idx()
+
+        if include_grading:
+            out['expansion'],  out['te_grading'], out['icm_grading'] = self.get_grading()
+
+        if include_stage:
+            out['stage_classif'] = self.get_stage_classification()
+
+        return out
     
     # ==================== Image Access Methods ====================
     
@@ -252,7 +388,7 @@ class EmbryoImage:
         try:
             if os.path.exists(cells_file):
                 os.remove(cells_file)
-            detect.run(weights=self.PATH_COUNTING_MODEL, source=self.path, project=path_tmp,name = name, device = 1,save_txt=True)
+            detect.run(weights=self.PATH_COUNTING_MODEL, source=self.path, project=path_tmp,name = name, device = 0,save_txt=True)
                    
             if os.path.exists(cells_file):
                 with open(cells_file, 'r') as f:
@@ -412,10 +548,16 @@ class EmbryoImage:
             self.ZP_r = 0
             self.ZP_thickness = 0
             return self.ZP_R, self.ZP_r
-        
-        self.ZP_thickness = np.mean(thikness(polar_band))
+
+        thickness_values = np.array(thikness(polar_band))
+        mean_t = thickness_values.mean() if len(thickness_values) > 0 else 0
+        std_t = thickness_values.std() if len(thickness_values) > 0 else 0
+        cv = std_t / mean_t if mean_t != 0 else 0
+
+        self.ZP_thickness = mean_t
         self.ZP_R, self.ZP_r = radius(polar_band)
-        
+        self.ZP_symmetry = max(0, 1 - cv) 
+
         return self.ZP_R, self.ZP_r
     
     def get_ZP_thickness(self) -> float:
@@ -448,37 +590,13 @@ class EmbryoImage:
     
     def get_ZP_symmetry(self) -> float:
         """
-        Calculate ZP symmetry using IoU with ideal symmetric ZP.
+        Calculate ZP symmetry computing the coefficient of variation.
         
         Returns:
             Symmetry score (0-1), where 1 is perfectly symmetric
         """
         if self.ZP_symmetry is None:
-            hull_te = hull(self.get_TE())
-            ZP_sint = hull_te.copy()
-            
-            # Dilate until ZP is covered
-            i = 0
-            ZP_sint = cv2.dilate(ZP_sint, np.ones((3, 3), np.uint8))
-            zp_mask = self.get_ZP()
-            
-            while (cv2.bitwise_or(ZP_sint, zp_mask) != ZP_sint).any() and i < 200:
-                ZP_sint = cv2.dilate(ZP_sint, np.ones((3, 3), np.uint8))
-                i += 1
-            
-            ZP_sint = ZP_sint - hull_te
-            
-            # Save synthetic ZP for debugging
-            os.makedirs('output', exist_ok=True)
-            cv2.imwrite('output/ZP_sint.png', ZP_sint)
-            
-            # Calculate IoU
-            intersection = cv2.bitwise_and(ZP_sint, zp_mask)
-            
-            try:
-                self.ZP_symmetry = np.sum(intersection) / np.sum(ZP_sint)
-            except:
-                self.ZP_symmetry = 0
+            self.get_ZP_R_r()  # This computes ZP_symmetry as well
         
         return self.ZP_symmetry
     
@@ -769,9 +887,25 @@ class EmbryoImage:
             Grading string or None
         """
         if self.grading is None:
-            self.grading = [self.get_expansion(), self.get_te_grading(), self.get_icm_grading()]
+            if self.get_expansion()> 2:
+                self.grading = [self.get_expansion(), self.get_te_grading(), self.get_icm_grading()]
+            else:
+                self.grading = [self.get_expansion(), None, None]
         return self.grading
     
+    # ==================== Stage Classification Methods ====================
+    def get_stage_classification(self) -> Optional[str]:
+        """
+        Get the developmental stage classification of the embryo.
+        
+        Returns:
+            Stage classification string or None
+        """
+        if self.stage_classif is None:
+            self.stage_classif = run(self.get_cropped_embryo(), checkpoint=self.PATH_STAGE_CLASSIF, task='STAGE')
+        
+        return self.stage_classif
+
     # ==================== Fragmentation Methods ====================
 
     def get_fragmentation(self) -> Optional[np.ndarray]:
@@ -782,7 +916,7 @@ class EmbryoImage:
             Binary mask of fragmented regions or None
         """
         if self.fragmentation is None:
-            self.fragmentation = predict_mask(img=self.get_cropped_embryo(), task='Fragmentation', checkpoint=self.PATH_FRAGMENTATION_MODEL)
+            self.fragmentation = predict_mask(img=self.get_image(), task='Fragmentation', checkpoint=self.PATH_FRAGMENTATION_MODEL)
 
         return self.fragmentation
     
@@ -807,62 +941,12 @@ class EmbryoImage:
         Returns:
             Dictionary containing all measured metrics
         """
-        # Check if segmentation is valid
-        if len(np.unique(self.get_blasto_seg())) == 1:
-            return {
-                'diameter': 0,
-                'area': 0,
-                'ZP_R': 0,
-                'ZP_r': 0,
-                'ZP_thickness': 0,
-                'ZP_area': 0,
-                'ZP_symmetry': 0,
-                'TE_area': 0,
-                'TE_fractal_d': 0,
-                'TE_mean_thickness': 0,
-                'TE_area_ratio': 0,
-                'ICM_area': 0,
-                'ICM_area_ratio': 0,
-                'ICM_eccentricity': 0,
-                'BC_area': 0,
-                'BC_area_ratio': 0,
-                'n_cells': 0,
-                'cleavage': None,
-                'fragmentation_idx': 0,
-                'expansion': None,
-                'te_grading': None,
-                'icm_grading': None,
-                'grading': None,
-            }
-        
-        # Compute all metrics
-        zp_r, zp_r_inner = self.get_ZP_R_r()
-        
-        return {
-            'diameter': self.get_diameter(),
-            'area': self.get_area(),
-            'ZP_R': zp_r,
-            'ZP_r': zp_r_inner,
-            'ZP_thickness': self.get_ZP_thickness(),
-            'ZP_area': self.get_ZP_area(),
-            'ZP_symmetry': self.get_ZP_symmetry(),
-            'TE_area': self.get_TE_area(),
-            'TE_fractal_d': self.get_TE_fractal_d(),
-            'TE_mean_thickness': np.mean(self.TE_thickness) if self.TE_thickness is not None else 0,
-            'TE_area_ratio': self.get_TE_area_ratio(),
-            'ICM_area': self.get_ICM_area(),
-            'ICM_area_ratio': self.get_ICM_area_ratio(),
-            'ICM_eccentricity': self.get_ICM_eccentricity(),
-            'BC_area': self.get_BC_area(),
-            'BC_area_ratio': self.get_BC_area_ratio(),
-            'n_cells': self.get_number_of_cells(),
-            'cleavage': self.get_cleavage(),
-            'fragmentation_idx': self.get_fragmentation_idx(),
-            'expansion': self.get_expansion(),
-            'te_grading': self.get_te_grading(),
-            'icm_grading': self.get_icm_grading(),
-            'grading': self.get_grading(),
-        }
+        return self.get_values(
+            include_cell_count=True,
+            include_fragmentation=True,
+            include_grading=True,
+            include_stage=True,
+        )
     
     def reset_values(self) -> None:
         """Reset all computed values to None.""" 
@@ -890,7 +974,7 @@ class EmbryoImage:
         self.te_grading = None 
         self.icm_grading = None 
         self.grading = None
-        
+        self.stage_classif = None
     # ==================== Visualization Methods ====================
     
     def draw_prediction(self, filename: str = 'output/prediction.png') -> None:

@@ -15,12 +15,12 @@ from data.managment import prepare_datasets
 from data.augmentation import get_train_transforms, get_val_transforms
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from config.config import PATH_DATASET
+from config.config import PATH_DATASET, PATH_MODELS
 
 
 WEIGHTS_LOSS = {
-    'blasto_str':    1.0,   # upweight segmentation
-    'fragmentation': 1.0,
+    'blasto_str':    2.0,   # upweight segmentation
+    'fragmentation': 2.0,
     'exp':           1.0,
     'icm':           1.0,
     'te':            1.0,
@@ -79,12 +79,18 @@ class Trainer:
         else:
             print(f"Using single device: {self.device}")
             self.model = self.base_model
-            
+        
         # Freeze encoder if requested
         if self.freeze_encoder:
+            # Trainer._setup_model
             encoder = self.model.module.encoder if self.multi_gpu else self.model.encoder
-            for param in encoder.parameters():
+            backbone = encoder.encoder if hasattr(encoder, 'proj_main') else encoder  # FEMI: ViT only
+            for param in backbone.parameters():
                 param.requires_grad = False
+
+            # Trainer.unfreeze_encoder, new branch
+        elif hasattr(encoder, 'proj_main'):  # FEMIEncoder: ViT blocks, deepest first
+            layer_groups = list(encoder.encoder.encoder.layer)[::-1]
             print("Encoder frozen")
     
     def _setup_optimizer(self):
@@ -206,7 +212,16 @@ class Trainer:
         if layers == 'all':
             candidates = list(encoder.parameters())
         else:
-            layer_groups = [encoder.layer4, encoder.layer3, encoder.layer2, encoder.layer1]
+            # Deepest -> shallowest layer groups, architecture-specific.
+            if hasattr(encoder, 'layer4'):  # ResNetEncoder
+                layer_groups = [encoder.layer4, encoder.layer3, encoder.layer2, encoder.layer1]
+            elif hasattr(encoder, 'block5'):  # EfficientNetB3Encoder
+                layer_groups = [encoder.block5, encoder.block4, encoder.block3, encoder.block2, encoder.block1]
+            else:
+                raise ValueError(
+                    f"unfreeze_encoder: don't know how to unfreeze layer groups for "
+                    f"encoder type {type(encoder).__name__}"
+                )
             candidates = [p for group in layer_groups[:layers] for p in group.parameters()]
 
         # Only unfreeze params that are still frozen to avoid duplicates
@@ -455,19 +470,21 @@ def main(args):
     train_videos = video_samples[:vid_split]
     val_videos   = video_samples[vid_split:]
 
-    size =(224, 224)
+    size =(224,224)
 
     train_dataset = MultiTaskDataset(
         image_samples=train_images,
         video_samples=train_videos,
         img_size=size,
-        transform=get_train_transforms(size) if args.data_augmentation else None
+        transform=get_train_transforms(size, normalize=args.encoder != "femi") if args.data_augmentation else None,
+        use_femi_processor=args.encoder == "femi",
     )
     val_dataset = MultiTaskDataset(
         image_samples=val_images,
         video_samples=val_videos,    
         img_size=size,
-        transform=get_val_transforms()
+        transform=get_val_transforms(normalize=args.encoder != "femi"),
+        use_femi_processor=args.encoder == "femi",
     )
 
     print(f"Train samples: {len(train_dataset)} (img: {len(train_images)}, vid: {len(train_videos)})")
@@ -576,13 +593,13 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument("--transformer", action="store_true", help="Use transformer model")
-    parser.add_argument("--frames", type=int, default=50, help="Number of frames for video input (default: 50)")
+    parser.add_argument("--frames", type=int, default=16, help="Number of frames for video input (default: 16)")
     parser.add_argument("--device", type=str, default="cuda", help="Device to use: cuda or cpu (default: cuda)")
     parser.add_argument("--batch_size", type=int, default=4, help="Batch size (default: 4)")
     parser.add_argument("--multi_gpu", action="store_true", help="Use DataParallel multi-GPU training")
     parser.add_argument('--weighted_loss', action='store_true', help="use weight loss for classification")
     parser.add_argument('--data_augmentation', action= 'store_true', help='whether data augmentation is applied')
-    parser.add_argument('--path_model', type = str, default= 'models/assessment/Multitask/')
+    parser.add_argument('--path_model', type = str, default= PATH_MODELS + '/assessment/Multitask/')
     parser.add_argument('--oversample', action='store_true', help='Oversample minority classes using inverse-frequency weights.')
     parser.add_argument('--oversample_factor', type=float, default=1.5,help='Epoch size multiplier when oversampling (default 1.5).')
     parser.add_argument('--task_weights',type=str, default=None,help='JSON dict of task multipliers, e.g. \'{"icm":2.0,"te":2.0}\'')

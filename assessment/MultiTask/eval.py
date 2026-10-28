@@ -591,7 +591,7 @@ class MultiTaskEvaluator:
                     cm, 
                     self.output_dir / 'confusion_matrix_EXP.png',
                     title='EXP Confusion Matrix',
-                    labels=[f'Class {i}' for i in labels]
+                    labels=range(1,6)
                 )
                 
                 report = classification_report(
@@ -620,14 +620,14 @@ class MultiTaskEvaluator:
                 f.write("="*60 + "\n")
                 f.write("ICM CLASSIFICATION\n")
                 f.write("="*60 + "\n")
-                
+                class_map = {'A':0, 'B':1, 'C':2}
                 labels = sorted(list(set(self.metrics.icm_labels)))
                 cm = confusion_matrix(self.metrics.icm_labels, self.metrics.icm_preds, labels=labels)
                 self.save_confusion_matrix(
                     cm,
                     self.output_dir / 'confusion_matrix_ICM.png',
                     title='ICM Confusion Matrix',
-                    labels=[f'Class {i}' for i in labels]
+                    labels=list(class_map.keys())
                 )
                 
                 report = classification_report(
@@ -656,14 +656,14 @@ class MultiTaskEvaluator:
                 f.write("="*60 + "\n")
                 f.write("TE CLASSIFICATION\n")
                 f.write("="*60 + "\n")
-                
+                class_map = {'A':0, 'B':1, 'C':2}
                 labels = sorted(list(set(self.metrics.te_labels)))
                 cm = confusion_matrix(self.metrics.te_labels, self.metrics.te_preds, labels=labels)
                 self.save_confusion_matrix(
                     cm,
                     self.output_dir / 'confusion_matrix_TE.png',
                     title='TE Confusion Matrix',
-                    labels=[f'Class {i}' for i in labels]
+                    labels=list(class_map.keys())
                 )
                 
                 report = classification_report(
@@ -692,14 +692,14 @@ class MultiTaskEvaluator:
                 f.write("="*60 + "\n")
                 f.write("STAGE CLASSIFICATION\n")
                 f.write("="*60 + "\n")
-                
+                classmap = {'empty':0, '1cell':1, '2cell':2, '+3cell':3, '+8cell':4, 'morula':5, 'blastocyst':6}
                 labels = sorted(list(set(self.metrics.stage_labels)))
                 cm = confusion_matrix(self.metrics.stage_labels, self.metrics.stage_preds, labels=labels)
                 self.save_confusion_matrix(
                     cm,
                     self.output_dir / 'confusion_matrix_STAGE.png',
                     title='STAGE Confusion Matrix',
-                    labels=[f'Class {i}' for i in labels]
+                    labels=list(classmap.keys())
                 )
                 
                 report = classification_report(
@@ -879,7 +879,12 @@ def main(args):
     # Prepare dataset
     path = Path(args.path)
     image_samples, video_samples = prepare_datasets(path, args.transformer, split="test", tasks=args.tasks)
-    test_dataset = MultiTaskDataset(image_samples=image_samples, video_samples=video_samples, img_size=(224, 224))
+    test_dataset = MultiTaskDataset(
+        image_samples=image_samples,
+        video_samples=video_samples,
+        img_size=(224, 224),
+        use_femi_processor=args.encoder == "femi",
+    )
     
     print(f"Total test samples: {len(test_dataset)}\n")
     
@@ -963,7 +968,7 @@ if __name__ == "__main__":
     
     # Model settings
     parser.add_argument("--transformer",action="store_true",help="Enable transformer for video evaluation (required for video samples)")
-    parser.add_argument("--frames", type=int, default=50, help="Number of frames used during training (must match checkpoint)")
+    parser.add_argument("--frames", type=int, default=16, help="Number of frames used during training (must match checkpoint)")
     parser.add_argument("--weighted_loss", action="store_true", help="Build model with weighted loss heads (must match training checkpoint)")
     args = parser.parse_args()
     main(args)

@@ -14,7 +14,7 @@ Output layout
 
 Each .pt file contains:
     {
-        "embeddings": FloatTensor (T, 768),
+        "embeddings": FloatTensor (T, 1024),
         "mask":       LongTensor  (T,)      1 = valid frame, 0 = blank
         "video_file": str,
         "n_valid":    int,
@@ -28,7 +28,7 @@ Usage
 
 import argparse
 import json
-import os
+import os, cv2
 import sys
 from pathlib import Path
 
@@ -40,7 +40,7 @@ from huggingface_hub import login
 from transformers import AutoImageProcessor, ViTMAEModel
 
 # ── shared helpers ────────────────────────────────────────────────────────────
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 from assessment.vIAbility.data.data_utils import (
     PATH_DST, PATH_EXCEL,
     DEFAULT_N_FRAMES, DEFAULT_START_TIME, DEFAULT_FREQ, DEFAULT_FRAME_SIZE,
@@ -50,14 +50,9 @@ from assessment.vIAbility.data.data_utils import (
 
 log = get_logger(__name__)
 
-# ── ImageNet normalisation (used before feeding frames to FEMI) ───────────────
-_PREPROCESS = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Resize((224, 224)),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                         std =[0.229, 0.224, 0.225]),
-])
 
+
+FEMI_SRC = PATH_DST / "videos"
 FEMI_DST = PATH_DST / "femi"
 
 
@@ -74,26 +69,25 @@ def embed_frames(
 ) -> torch.Tensor:
     """
     Run FEMI in mini-batches and return CLS-token embeddings.
-
+ 
     Returns
     -------
-    embeddings : FloatTensor (T, 768)
+    embeddings : FloatTensor (T, 1024)
     """
     all_embeddings = []
-
+ 
     for i in range(0, len(frames), batch_size):
-        batch        = frames[i: i + batch_size]
-        pil_batch    = [Image.fromarray(f) for f in batch]
-        tensor_batch = torch.stack([_PREPROCESS(img) for img in pil_batch])
-        inputs       = processor(images=tensor_batch, return_tensors="pt").to(device)
-
+        batch     = frames[i: i + batch_size]
+        pil_batch = [Image.fromarray(f) for f in batch]
+        inputs = processor(images=pil_batch, return_tensors="pt").to(device)
+ 
         with torch.no_grad():
             outputs = model(**inputs)
-            cls_emb = outputs.last_hidden_state[:, 0, :].cpu()   # (B, 768)
-
+            cls_emb = outputs.last_hidden_state[:, 0, :].cpu()   # (B, 1024)
+ 
         all_embeddings.append(cls_emb)
-
-    return torch.cat(all_embeddings, dim=0)   # (T, 768)
+ 
+    return torch.cat(all_embeddings, dim=0)   # (T, 1024)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -124,8 +118,9 @@ def run_split(
 
         # ── load frames ───────────────────────────────────────────────────
         try:
+            video_filename = Path(split)/str(label)/video_file
             frames, mask = extract_frames(
-                video_file, metadata_df,
+                video_filename, metadata_df,
                 start_time=args.start_time,
                 freq=args.frequency,
                 n_frames=args.n_frames,
@@ -156,7 +151,7 @@ def run_split(
         # ── save ──────────────────────────────────────────────────────────
         torch.save(
             {
-                "embeddings": embeddings,           # (T, 768) float32
+                "embeddings": embeddings,           # (T, 1024) float32
                 "mask":       torch.tensor(mask),   # (T,)     int
                 "video_file": video_file,
                 "n_valid":    n_valid,
@@ -195,6 +190,13 @@ def main(args: argparse.Namespace) -> None:
     log.info("Loading FEMI '%s' onto %s …", args.model_id, args.device)
     processor = AutoImageProcessor.from_pretrained(args.model_id)
     femi      = ViTMAEModel.from_pretrained(args.model_id).to(args.device)
+    # ViTMAEModel randomly masks ~75% of patches (mask_ratio) on every
+    # forward call regardless of .eval()/.train() — it's baked into the
+    # embeddings module, not a dropout-style layer. Without this, the CLS
+    # token below would be computed from a different random 25% of each
+    # frame's patches every run, making the saved embeddings noisy and
+    # non-deterministic. Force full-frame, deterministic extraction:
+    femi.config.mask_ratio = 0.0
     femi.eval()
     log.info("FEMI loaded.")
 

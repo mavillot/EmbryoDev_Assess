@@ -1,95 +1,129 @@
 import os, sys
-import tqdm
-import glob
 from pathlib import Path
+import glob
+
 import pandas as pd
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from config.config import PATH_DATASET
 from assessment.vIAbility.tabular.dataset import parse_video_name
 
-dir_path = os.path.join(PATH_DATASET, "Oslo_viability/markers")
-labels_path = os.path.join(PATH_DATASET, "Oslo_viability/original.xlsx")
-files = glob.glob(os.path.join(dir_path, "*/*/*.csv"))
-true_df      = pd.read_excel(labels_path, sheet_name="Morula_Blast_nov")
+DIR_PATH = os.path.join(PATH_DATASET, "Oslo_viability/markers")
+LABELS_PATH = os.path.join(PATH_DATASET, "Oslo_viability/original.xlsx")
+OUT_DIR = os.path.join("", "timing_results")
+os.makedirs(OUT_DIR, exist_ok=True)
 
-errors = {'t2': [], 't4': [],  't8': [], 'tM': [], 'tB': [], 'Fragmentation': []}
-for f in tqdm.tqdm(files):
-    name = Path(f).stem
-    predicted_df = pd.read_csv(f)
-    
-    id, well = parse_video_name(name)
+# Events based on the first frame where `n_cells` reaches a given value
+CELL_COUNT_EVENTS = {
+    "t2": 2, "t3": 3, "t4": 4, "t5": 5,
+    "t6": 6, "t7": 7, "t8": 8,
+}
+# Events based on the first frame where `cleavage` reaches a given value
+CLEAVAGE_EVENTS = {
+    "tM": 1,
+    "tB": 2,
+}
 
-    true_row = true_df[(true_df["Slide ID"] == id) & (true_df["Well"] == well)]
-    n_cells = list(predicted_df['n_cells'])
-    if not pd.isna(true_row['t2'].iloc[0]):
-        try:
-            t2 = n_cells.index(2)
-        except:
-            t2 = 0
-        errors['t2'].append(abs(t2 - true_row['t2'].iloc[0]))
-    if not pd.isna(true_row['t4'].iloc[0]):
-        try:
-            t4 = n_cells.index(4)
-        except:
-            t4 = 0
-        errors['t4'].append(abs(t4 - true_row['t4'].iloc[0]))
-    if not pd.isna(true_row['t8'].iloc[0]):
-        try:
-            t8 = n_cells.index(8)
-        except:
-            t8 = 0
-        errors['t8'].append(abs(t8 - true_row['t8'].iloc[0]))
-    cleavage = list(predicted_df['cleavage'])
-    if not pd.isna(true_row['tM'].iloc[0]):
-        try:
-            tM = cleavage.index(1)
-        except:
-            tM = 0
-        errors['tM'].append(abs(tM - true_row['tM'].iloc[0]))
-    if not pd.isna(true_row['tB'].iloc[0]):
-        try:
-            tB = cleavage.index(2)
-        except:
-            tB = 0
-        tB = 0 if not tB else tB
-        errors['tB'].append(abs(tB - true_row['tB'].iloc[0]))
-
-    fragmentation_idx = list(predicted_df['fragmentation_idx'])
-    if not pd.isna(true_row['Fragmentation - Value'].iloc[0]) and not pd.isna(true_row['Fragmentation - Time'].iloc[0]):
-        frag_hour = round(true_row['Fragmentation - Time'].iloc[0])
-        try:   
-            frag = fragmentation_idx[frag_hour]
-        except:
-            frag = 0
-        errors['Fragmentation'].append(abs(frag - true_row['Fragmentation - Value'].iloc[0]))
-
-   
-
-for key, value in errors.items():
-    plt.figure()
-    plt.hist(value, bins=20)
-    plt.title(f"Error distribution for {key}")
-    plt.xlabel("Absolute error (frames)")
-    plt.ylabel("Frequency")
-    plt.show()
-    plt.savefig(f"error_distribution_{key}.png")
-
-print("Errors:")
-for key, value in errors.items():
-    print(f"{key}: {len(value)} samples")
+# Fragmentation is predicted as a value in [0, 1]; it must be rescaled to
+# 0-100 and snapped to the established clinical grading scale.
+FRAGMENTATION_LEVELS = [
+    (60, 75),
+    (40, 50),
+    (20, 35),
+    (10, 15),
+    (1, 5),
+]
 
 
-print("Mean absolute errors:")
-for key, value in errors.items():
-    print(key)
-    mean_error = sum(value) / len(value) if value else 0
-    length = len(value)
-    median_error = sorted(value)[length // 2] if length > 0 else 0
-    print(f"Mean: {mean_error:.2f} hours")
-    print(f"Median: {median_error:.2f} hours")
-    print(f"Min: {min(value):.2f} hours")
-    print(f"Max: {max(value):.2f} hours")
-    print('#############################################')
+def first_index(values, target):
+    """Index of first occurrence of `target` in `values`, or 0 if absent."""
+    try:
+        return values.index(target)
+    except ValueError:
+        return 0
+
+
+def map_fragmentation(pred):
+    """Rescale a [0, 1] fragmentation prediction to 0-100 and snap it to
+    the nearest established grading level (5, 15, 35, 50, 75)."""
+    pct = pred * 100
+    for threshold, level in FRAGMENTATION_LEVELS:
+        if pct > threshold:
+            return level
+    return 0
+
+
+def main():
+    files = glob.glob(os.path.join(DIR_PATH, "*/*/*.csv"))
+    true_df = pd.read_excel(LABELS_PATH, sheet_name="Morula_Blast_nov")
+
+    event_names = list(CELL_COUNT_EVENTS) + list(CLEAVAGE_EVENTS) + ["Fragmentation"]
+    # records[event] -> list of dicts {ID, Well, prediction, ground_truth, error}
+    records = {name: [] for name in event_names}
+
+    for f in tqdm(files):
+        name = Path(f).stem
+        predicted_df = pd.read_csv(f)
+        vid_id, well = parse_video_name(name)
+
+        true_row = true_df[(true_df["ID"] == vid_id) & (true_df["Well"] == well)]
+        if true_row.empty:
+            continue
+        true_row = true_row.iloc[0]
+
+        n_cells = predicted_df["n_cells"].tolist()
+        cleavage = predicted_df["cleavage"].tolist()
+        fragmentation_idx = predicted_df["fragmentation_idx"].tolist()
+
+        for event, target in {**CELL_COUNT_EVENTS, **CLEAVAGE_EVENTS}.items():
+            gt = true_row[event]
+            if pd.isna(gt):
+                continue
+            values = n_cells if event in CELL_COUNT_EVENTS else cleavage
+            pred = first_index(values, target)
+            records[event].append({
+                "ID": vid_id,
+                "Well": well,
+                "prediction": pred,
+                "ground_truth": gt,
+                "error": abs(pred - gt),
+            })
+
+        frag_value = true_row["Fragmentation - Value"]
+        frag_time = true_row["Fragmentation - Time"]
+        if not pd.isna(frag_value) and not pd.isna(frag_time):
+            frag_hour = round(frag_time)
+            raw_frag = (
+                fragmentation_idx[frag_hour]
+                if 0 <= frag_hour < len(fragmentation_idx)
+                else 0
+            )
+            pred_frag = map_fragmentation(raw_frag)
+            records["Fragmentation"].append({
+                "ID": vid_id,
+                "Well": well,
+                "prediction": pred_frag,
+                "ground_truth": frag_value,
+                "error": abs(pred_frag - frag_value),
+            })
+
+    # Save one CSV per event (t2, t3, ..., tM, tB, Fragmentation) and plot error histograms
+    for event, rows in records.items():
+        df = pd.DataFrame(rows)
+        df.to_csv(os.path.join(OUT_DIR, f"{event}.csv"), index=False)
+
+        if not df.empty:
+            plt.figure()
+            plt.hist(df["error"])
+            plt.title(f"{event} error distribution")
+            plt.xlabel("Absolute error")
+            plt.ylabel("Count")
+            plt.savefig(os.path.join(OUT_DIR, f"{event}_hist.png"))
+            plt.close()
+
+
+if __name__ == "__main__":
+    main()

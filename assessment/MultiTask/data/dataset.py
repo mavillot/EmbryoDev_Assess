@@ -5,6 +5,7 @@ from torch.utils.data import Dataset, Sampler
 from torchvision import transforms
 import random
 from PIL import Image
+from transformers import AutoImageProcessor
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 from config.config import IMAGE_SIZE
@@ -13,7 +14,7 @@ from data.augmentation import (
     apply_video_val_transforms,
 )
 
-
+processor = AutoImageProcessor.from_pretrained("ihlab/FEMI")
 # ---------------------------------------------------------------------------
 # Fallback transforms (used when no albumentations pipeline is provided)
 # ---------------------------------------------------------------------------
@@ -29,6 +30,13 @@ def transform_image(img, size):
     )(img)
     return img
 
+def transform_femi(img):
+    if isinstance(img, np.ndarray):
+        if img.ndim == 2:
+            img = np.repeat(img[..., None], 3, axis=-1)
+        img = Image.fromarray(img.astype(np.uint8))
+    inputs = processor(images=img, return_tensors="pt")
+    return inputs["pixel_values"].squeeze(0)
 
 def transform_mask(mask, size):
     if isinstance(mask, Image.Image):
@@ -63,6 +71,8 @@ class MultiTaskDataset(Dataset):
         is_train:           if True and video_transform is provided, spatial+
                             appearance augmentation is applied to videos;
                             otherwise only the val deterministic pipeline runs.
+        use_femi_processor: if True, apply the FEMI image processor to every
+                            image and video frame after augmentation.
     """
 
     def __init__(
@@ -73,6 +83,7 @@ class MultiTaskDataset(Dataset):
         transform=None,
         video_transform=None,
         is_train=False,
+        use_femi_processor=False,
     ):
         self.image_samples  = image_samples  if image_samples  is not None else []
         self.video_samples  = video_samples  if video_samples  is not None else []
@@ -80,6 +91,7 @@ class MultiTaskDataset(Dataset):
         self.transform      = transform
         self.video_transform = video_transform
         self.is_train       = is_train
+        self.use_femi_processor = use_femi_processor
 
         self.samples = (
             [('image', s) for s in self.image_samples] +
@@ -117,12 +129,15 @@ class MultiTaskDataset(Dataset):
 
                 augmented = self.transform(**aug_input)
                 img       = augmented['image']
-                mask_str  = augmented['mask_str'].long()  if mask_str  is not None else None
-                mask_frag = augmented['mask_frag'].long() if mask_frag is not None else None
+                mask_str  = torch.as_tensor(augmented['mask_str']).long()  if mask_str  is not None else None
+                mask_frag = torch.as_tensor(augmented['mask_frag']).long() if mask_frag is not None else None
             else:
-                img = transform_image(img, size=self.img_size)
+                img = transform_femi(img) if self.use_femi_processor else transform_image(img, size=self.img_size)
                 if mask_str  is not None: mask_str  = transform_mask(mask_str, size=self.img_size)
                 if mask_frag is not None: mask_frag = transform_mask(mask_frag, size=self.img_size)
+
+            if self.use_femi_processor and self.transform is not None:
+                img = transform_femi(img)
 
             return {
                 'type':       'image',
@@ -154,7 +169,11 @@ class MultiTaskDataset(Dataset):
                     vid = apply_video_val_transforms(vid, self.video_transform)
             else:
                 # Fallback: simple per-frame resize + normalize (no augmentation)
-                vid = torch.stack([transform_image(f, size=self.img_size) for f in vid], dim=0)
+                frame_transform = transform_femi if self.use_femi_processor else transform_image
+                if self.use_femi_processor:
+                    vid = torch.stack([frame_transform(f) for f in vid], dim=0)
+                else:
+                    vid = torch.stack([frame_transform(f, size=self.img_size) for f in vid], dim=0)
 
             return {
                 'type':       'video',

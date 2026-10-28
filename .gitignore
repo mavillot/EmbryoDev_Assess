@@ -7,3 +7,10 @@ output/
 assessment/ploidIA/dataset/extract_femi.py
 assessment/vIAbility/data/antiguo/extract_FEMI_features_antiguo.py
 markers/stage_classification/data/femi_prep.py
+assessment/embryo_utils/other
+assessment/ploidIA/models_antiguo
+assessment/vIAbility/video_classif
+Notebooks/images_tesis.ipynb
+results/
+create_excel_results.py
+tabfm

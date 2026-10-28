@@ -1,6 +1,6 @@
-Test accuracy:  60.47%
-Test precision: 60.00%
-Test recall:    78.26%
-Test F1:        67.92%
-Test F0.5:      61.57%
-Test AUROC:     60.05%
+Test accuracy:  58.14%
+Test precision: 60.42%
+Test recall:    63.04%
+Test F1:        61.70%
+Test F0.5:      60.69%
+Test AUROC:     60.54%

@@ -42,6 +42,7 @@ PARAM_GRID = {'RandomForest': {'n_estimators': [50, 100, 200],
                                   'solver': ['lbfgs', 'liblinear', 'saga'],
                                   'random_state': [SEED], "class_weight": ["balanced", None]},
                 'TabPFN': {'ignore_pretraining_limits':[True]},
+                'TabFM': {}
             }
 
 

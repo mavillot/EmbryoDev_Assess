@@ -13,7 +13,6 @@ from typing import Dict, List, Tuple, Optional
 
 from models.multi_task import MultiTaskModel
 from models.encoder.visual_encoder import ResNetEncoder, EfficientNetB3Encoder
-from models.temporal.temporal_transformer import VideoTransformer
 from data.dataset import MultiTaskDataset, multitask_collate, MultiTaskBatchSampler
 from data.managment import prepare_datasets
 
@@ -61,7 +60,6 @@ class MetricsTracker:
         
         # Counters
         self.total_images = 0
-        self.total_videos = 0
     
     @staticmethod
     def dice_score(pred: torch.Tensor, target: torch.Tensor, eps: float = 1e-6) -> float:
@@ -244,7 +242,6 @@ class MetricsTracker:
         """Get summary of all metrics."""
         summary = {
             'total_images': self.total_images,
-            'total_videos': self.total_videos
         }
         
         # Helper function to compute per-class metrics
@@ -363,7 +360,6 @@ class MultiTaskEvaluator:
         checkpoint_path: str,
         device: str = 'cuda',
         multi_gpu: bool = False,
-        use_transformer: bool = True,
         output_dir: str = "output/assessment/MultiTask/evaluation/"
     ):
         """
@@ -374,14 +370,12 @@ class MultiTaskEvaluator:
             checkpoint_path: Path to model checkpoint
             device: Device to run evaluation on
             multi_gpu: Whether to use multiple GPUs
-            use_transformer: Whether to enable transformer for video processing
             output_dir: Directory to save evaluation results
         """
         self.base_model = model
         self.checkpoint_path = checkpoint_path
         self.device = device if torch.cuda.is_available() else 'cpu'
         self.multi_gpu = multi_gpu and torch.cuda.device_count() > 1
-        self.use_transformer = use_transformer
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
@@ -395,7 +389,6 @@ class MultiTaskEvaluator:
         print(f"  Multi-GPU: {self.multi_gpu}")
         if self.multi_gpu:
             print(f"  Number of GPUs: {torch.cuda.device_count()}")
-        print(f"  Transformer enabled: {self.use_transformer}")
         print(f"  Output directory: {self.output_dir}")
     
     def _load_model(self):
@@ -473,7 +466,6 @@ class MultiTaskEvaluator:
         # Forward pass
         outputs, _ = self.model(
             images=batch.get('images'),
-            videos=batch.get('videos'),
             exp_labels=None,
             icm_labels=None,
             te_labels=None,
@@ -502,8 +494,6 @@ class MultiTaskEvaluator:
             # Count samples
             if batch.get('images') is not None:
                 self.metrics.total_images += batch['images'].shape[0]
-            if batch.get('videos') is not None:
-                self.metrics.total_videos += batch['videos'].shape[0]
             
             # Get predictions
             outputs = self.evaluate_batch(batch)
@@ -520,7 +510,6 @@ class MultiTaskEvaluator:
         
         print("\nEvaluation complete!")
         print(f"Total images: {summary['total_images']}")
-        print(f"Total videos: {summary['total_videos']}")
         
         return summary
     
@@ -534,7 +523,6 @@ class MultiTaskEvaluator:
             f.write("="*60 + "\n\n")
             
             f.write(f"Total images evaluated: {self.metrics.total_images}\n")
-            f.write(f"Total videos evaluated: {self.metrics.total_videos}\n\n")
             
             # EXP Classification
             if self.metrics.exp_labels:
@@ -745,14 +733,10 @@ def main(args):
     # Setup device
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
-    # Validate transformer requirement
-    if not args.transformer:
-        print("WARNING: Transformer is disabled - video evaluation will be skipped")
-    
     # Prepare dataset
     path = Path(args.path)
-    image_samples, video_samples = prepare_datasets(path, args.transformer, split="test", task=args.baseline)
-    test_dataset = MultiTaskDataset(image_samples=image_samples, video_samples=video_samples)
+    image_samples = prepare_datasets(path, split="test", task=args.baseline)
+    test_dataset = MultiTaskDataset(image_samples=image_samples)
     
     print(f"Total test samples: {len(test_dataset)}\n")
     
@@ -772,15 +756,7 @@ def main(args):
     else:
         raise ValueError(f"Unknown encoder: {args.encoder}")
     
-    # Conditionally initialize transformer
-    if args.transformer:
-        transformer = VideoTransformer()
-        print("Transformer enabled for video evaluation")
-    else:
-        transformer = None
-        print("Transformer disabled - video samples will be skipped")
-    
-    model = MultiTaskModel(encoder, transformer, embedding_dim=512)
+    model = MultiTaskModel(encoder, embedding_dim=512)
     
     # Initialize evaluator
     evaluator = MultiTaskEvaluator(
@@ -788,7 +764,6 @@ def main(args):
         checkpoint_path=args.checkpoint,
         device=device,
         multi_gpu=args.multi_gpu,
-        use_transformer=args.transformer,
         output_dir=args.output_dir
     )
     
@@ -813,13 +788,13 @@ if __name__ == "__main__":
     )
     
     # Data paths
-    parser.add_argument("--path",type=str,required=True,help="Path to dataset directory", default=PATH_DATASET)
+    parser.add_argument("--path",type=str,help="Path to dataset directory", default=PATH_DATASET)
     parser.add_argument("--encoder", type=str, default="resnet34", help="Encoder architecture (default: resnet34)")
     parser.add_argument("--checkpoint",type=str,required=True,help="Path to model checkpoint")
     parser.add_argument("--baseline", type=str, help="Use baseline model", default=None)
     
     # Output
-    parser.add_argument("--output_dir",type=str,default=OUTPUT_PATH + "/assessment/MultiTask/evaluation/",help="Directory to save evaluation results")
+    parser.add_argument("--output_dir",type=str,default=OUTPUT_PATH + "/markers/MultiTask/evaluation/",help="Directory to save evaluation results")
     
     # Processing parameters
     parser.add_argument("--batch_size",type=int,default=1,help="Batch size for evaluation")
@@ -829,6 +804,5 @@ if __name__ == "__main__":
     parser.add_argument("--multi_gpu",action="store_true",help="Use multiple GPUs if available")
     
     # Model settings
-    parser.add_argument("--transformer",action="store_true",help="Enable transformer for video evaluation (required for video samples)")
     args = parser.parse_args()
     main(args)

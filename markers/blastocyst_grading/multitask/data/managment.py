@@ -1,3 +1,5 @@
+from importlib.resources import path
+
 import cv2
 from tqdm import tqdm
 import numpy as np
@@ -61,6 +63,33 @@ def dataset_seg_blastocyst(path, idx, split='train'):
     
     return data
 
+def dataset_oslo_blastocyst(path, idx):
+    data = []
+    class_map = {'A':0, 'B':1, 'C':2}
+    image_root = path / 'images'
+    #check if file exists
+    file = False
+    if (path / "extracted_blasto_data.csv").exists():
+        csv_grades = pd.read_csv(path / "extracted_blasto_data.csv", sep=",")
+        file = True
+    for img_name in image_root.iterdir():
+        img_path = image_root / img_name.name
+        img= 'images/' + img_name.name
+        exp = None
+        if file:
+            try:
+                icm = int(class_map[csv_grades.loc[csv_grades["path"] == img, "icm"].values[0]])
+            except (IndexError, ValueError,KeyError):
+                icm = None
+            try:
+                te = int(class_map[csv_grades.loc[csv_grades["path"] == img, "te"].values[0]])
+            except (IndexError, ValueError, KeyError):
+                te = None
+        img = cv2.imread(str(img_path))
+        data.append({'image': img, 'exp': exp, 'icm': icm, 'te': te, 'dataset_id':idx})
+    
+    return data
+
 
 def prepare_datasets(path, split = 'train',task=None, frames=50):
     """
@@ -79,9 +108,10 @@ def prepare_datasets(path, split = 'train',task=None, frames=50):
 
     data_seg_blasto       = dataset_seg_blastocyst(path / "PCMR_blastocyts",   3, split=split)
     print(f"PCMR grading samples: {len(data_seg_blasto)}")
+    data_oslo_blasto       = dataset_oslo_blastocyst(path / "Oslo_viability",   4) 
+    print(f"Oslo grading samples: {len(data_oslo_blasto)}")
 
-    all_img_samples = (data_grading_exp + data_grading_te + data_grading_icm +
-                       data_seg_blasto)
+    all_img_samples = (data_grading_exp + data_grading_te + data_grading_icm + data_seg_blasto + data_oslo_blasto)
 
 
     # --- Filter and clean for single-task mode ---

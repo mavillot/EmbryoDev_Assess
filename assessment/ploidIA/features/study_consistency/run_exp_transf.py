@@ -47,7 +47,7 @@ N_REPEATS = 5
 SEEDS = [SEED + i for i in range(N_REPEATS)]
 
 DATASETS = ["Combined"]
-FEATURES = ["markers"]
+FEATURES = ["femi"]
 PLAIN_MODELS = ["rnn", "gru", "lstm"]
 
 # (model, use_pos_encoding) pairs — pos-encoding only meaningful for transformer
@@ -65,7 +65,7 @@ BASE_ARGS = dict(
     checkpoint=str(BASE_MODELS),
     out_dir=str(BASE_OUTPUT),
     weight_loss=True,
-    loss="fbeta",
+    loss="ce",
     dropout=0.2,
     n_frames= 50,
     d_model=32, num_heads=4, ff_dim=64,

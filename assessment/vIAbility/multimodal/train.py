@@ -18,6 +18,7 @@ for the active sweep (R(2+1)D @ 15/16/20/30/60 frames × 5 repeats).
 import csv
 import json
 import os
+import time
 import sys
 import logging
 from datetime import datetime
@@ -104,7 +105,7 @@ class TrainConfig:
 
     # ── Training budget ───────────────────────────────────────────────────
     epochs: int     = 60
-    batch_size: int = 4
+    batch_size: int = 16
 
     # ── Early stopping ────────────────────────────────────────────────────
     patience: int    = 10
@@ -190,6 +191,7 @@ def run_epoch(cfg: TrainConfig, model: nn.Module, loader: DataLoader, criterion,
             with autocast("cuda", enabled=amp_enabled):
                 logits = model(frames, mask, tabular)
                 loss   = criterion(logits.view(-1), labels.float())
+
 
             if training:
                 optimizer.zero_grad()

@@ -62,7 +62,7 @@ class EmbryoVideo:
         'TE_area', 'TE_area_ratio', 'TE_fractal_d', 'TE_mean_thickness',
         'ICM_area', 'ICM_area_ratio', 'ICM_eccentricity',
         'BC_area', 'BC_area_ratio', 'n_cells', 'cleavage', 'fragmentation_idx', 
-        'expansion', 'te_grading', 'icm_grading'
+        'expansion', 'te_grading', 'icm_grading', 'stage_classif'
     ]
     root_dir = ''
     PATH_SEGMENTATION_MODEL = root_dir +'models/markers/blastocyst_segmentation/segmentation_hrnet.pth'
@@ -106,6 +106,7 @@ class EmbryoVideo:
             if not self.video.isOpened():
                 raise ValueError(f"Failed to open video file: {path}")
             self.fps = self.video.get(cv2.CAP_PROP_FPS)
+            length = int(self.video.get(cv2.CAP_PROP_FRAME_COUNT))
             # Frame storage
             self.video_frames: List[np.ndarray] = []
             self.mask = [1] * n_MAX  # Default mask (1 = real frame)
@@ -114,6 +115,7 @@ class EmbryoVideo:
                 raise ValueError("Either 'path' or 'frames' must be provided")  
             else:
                 self.video_frames = frames[:n_MAX]
+                length = len(self.video_frames)
                 self.mask = mask[:n_MAX] if mask else None
                 self.video = None
         
@@ -121,8 +123,8 @@ class EmbryoVideo:
         self.is_cropped = cropped
         self.cropped_video_frames: List[np.ndarray] = []
         self.segmented_frames: List[np.ndarray] = []
-        self.n_MAX = n_MAX
-        self.n_total= n_total
+        self.n_MAX = min(n_MAX, length)
+        self.n_total= min(n_total, self.n_MAX)
         self.step = max(1, self.n_total // self.n_MAX)
         
         # Embryo tracking

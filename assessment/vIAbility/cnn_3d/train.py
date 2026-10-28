@@ -19,7 +19,7 @@ import json
 import os
 import sys
 import logging
-from datetime import datetime
+import time
 
 import cv2
 import numpy as np
@@ -72,9 +72,9 @@ class TrainConfig:
     # data
     frame_h: int        = 112       # R(2+1)D expects 112 x 112
     frame_w: int        = 112
-    n_frames: int       = 16        # temporal depth (TIME_WINDOW length)
+    n_frames: int       = 20        # temporal depth (TIME_WINDOW length)
     num_workers: int    = 4
-    backbone: str       = "mvit"   # "r2plus1d_18" or "mvit"
+    backbone: str       = "r2plus1d_18"   # "r2plus1d_18" or "mvit"
 
     # ── Repetition bookkeeping ────────────────────────────────────────────
     # iteration: 1-indexed repeat number (used only for naming ckpts/outputs
@@ -104,7 +104,7 @@ class TrainConfig:
 
     # training budget
     epochs: int         = 31
-    batch_size: int     = 8
+    batch_size: int     = 32
 
     # early stopping
     patience: int       = 10
@@ -124,7 +124,7 @@ class TrainConfig:
     out_dir: str        = "results/assessment/vIAbility/3d_cnn"
 
     # misc
-    device: str         = field(default_factory=lambda: ("cuda:2" if torch.cuda.is_available() else "cpu"))
+    device: str         = field(default_factory=lambda: ("cuda:0" if torch.cuda.is_available() else "cpu"))
     amp: bool           = False      # mixed-precision; auto-disabled on CPU
 
     def __post_init__(self):
@@ -195,10 +195,12 @@ def run_epoch(
             frames = frames.to(device)
             mask   = mask.to(device)
             labels = labels.to(device)
-
+            start_time = time.time()
             with autocast("cuda", enabled=amp_enabled):
                 # MViTClassifier ignores the mask argument; pass it anyway — it's a no-op.
                 logits = model(frames, mask)
+                end_time = time.time()
+                log.info("Batch processed in %.4f seconds with a batch size of %d", end_time - start_time, frames.size(0))
                 loss = criterion(logits.view(-1), labels.float())
 
             if training:

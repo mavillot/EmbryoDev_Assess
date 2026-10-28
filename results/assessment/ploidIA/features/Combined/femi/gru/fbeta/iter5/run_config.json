@@ -11,6 +11,7 @@
   "weight_loss": true,
   "loss": "fbeta",
   "dropout": 0.2,
+  "n_frames": 50,
   "d_model": 32,
   "num_heads": 4,
   "ff_dim": 64,

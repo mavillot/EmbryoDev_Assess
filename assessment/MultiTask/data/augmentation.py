@@ -8,9 +8,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from config.config import IMAGE_SIZE
 
 
-def get_train_transforms(image_size=IMAGE_SIZE):
+def get_train_transforms(image_size=IMAGE_SIZE, normalize=True):
     h, w = image_size
-    return A.Compose([
+    transforms = A.Compose([
         # Spatial transforms
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
@@ -35,19 +35,26 @@ def get_train_transforms(image_size=IMAGE_SIZE):
         A.GaussNoise(p=0.3),                             
         A.GaussianBlur(blur_limit=(3, 5), p=0.2),
 
-        # Normalize + tensor
-        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ToTensorV2()
     ], additional_targets={'mask_str': 'mask', 'mask_frag': 'mask'})
+    if normalize:
+        transforms.transforms.extend([
+            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ToTensorV2(),
+        ])
+    return transforms
 
 
-def get_val_transforms(image_size=IMAGE_SIZE):
+def get_val_transforms(image_size=IMAGE_SIZE, normalize=True):
     h, w = image_size
-    return A.Compose([
+    transforms = A.Compose([
         A.Resize(h, w),
-        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ToTensorV2()
     ], additional_targets={'mask_str': 'mask', 'mask_frag': 'mask'})
+    if normalize:
+        transforms.transforms.extend([
+            A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ToTensorV2(),
+        ])
+    return transforms
 
 
 def get_video_train_transforms(image_size=IMAGE_SIZE):

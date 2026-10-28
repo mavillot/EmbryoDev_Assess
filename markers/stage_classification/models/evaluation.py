@@ -93,6 +93,20 @@ def save_confusion_matrix(cm, data, filepath):
     plt.savefig(filepath)
     plt.close()
 
+def save_accuracy_report(correct, total, class_names, filepath):
+    """Write per-class and overall accuracy to a plain text file."""
+    lines = ["── Per-class accuracy ──────────────────────────"]
+    for c, name in enumerate(class_names):
+        acc = correct[c] / total[c] * 100 if total[c] > 0 else float("nan")
+        lines.append(f"  {name:<10}  {int(correct[c]):>4}/{int(total[c]):<4}  {acc:.1f}%")
+    overall = correct.sum() / total.sum() * 100
+    lines.append(f"  {'OVERALL':<10}  {int(correct.sum()):>4}/{int(total.sum()):<4}  {overall:.1f}%")
+
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    print(f"\nAccuracy report saved → {filepath}")
+
 def evaluate(model, data_loader, class_names, device):
     model.eval()
     n_classes = len(class_names)
@@ -129,7 +143,7 @@ def evaluate(model, data_loader, class_names, device):
         print(f"  {name:<10}  {int(correct[c]):>4}/{int(total[c]):<4}  {acc:.1f}%")
     overall = correct.sum() / total.sum() * 100
     print(f"  {'OVERALL':<10}  {int(correct.sum()):>4}/{int(total.sum()):<4}  {overall:.1f}%")
-    return  all_labels, all_preds, incorrect_images, incorrect_labels
+    return  all_labels, all_preds, incorrect_images, incorrect_labels, correct, total
 
 def save_incorrect_images(incorrect_images, incorrect_labels, class_names, output_dir):
     os.makedirs(os.path.join(output_dir, "incorrect"), exist_ok=True)
@@ -152,15 +166,16 @@ def main(args):
     model = load_model(args.model_path, device)
 
     # ── Evaluate ─────────────────────────────────────────────────────────
-    labels, preds, incorrect_images, incorrect_labels = evaluate(model, data_loader, class_names, device)
+    labels, preds, incorrect_images, incorrect_labels, correct, total = evaluate(model, data_loader, class_names, device)
     cm = confusion_matrix(labels, preds)
     save_confusion_matrix(cm, data_loader.dataset, os.path.join(args.output_dir, "confusion_matrix.png"))
+    save_accuracy_report(correct, total, class_names, os.path.join(args.output_dir, "accuracy_report.txt"))
     if args.save_incorrect:
         save_incorrect_images(incorrect_images, incorrect_labels, class_names, args.output_dir)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate embryo stage classification")
-    parser.add_argument("--data_dir",   default=os.path.join(PATH_PROCESSED, "FEMI"), help="Root of dataset (should contain 'images/' and 'femi/')")
+    parser.add_argument("--data_dir",   default=os.path.join(PATH_PROCESSED, "Femi/test"), help="Root of dataset (should contain 'images/' and 'femi/')")
     parser.add_argument("--model_path", default="models/markers/stage_classif/FEMI/best_model.pt", help="Path to trained model checkpoint")
     parser.add_argument("--input",      default="femi", choices=["images", "femi"], help="Whether to evaluate on raw images or FEMI embeddings")
     parser.add_argument("--batch_size", type=int, default=32)

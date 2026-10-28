@@ -41,7 +41,7 @@ def build_dataloaders(data_dir: str, batch_size: int, val_split: float = 0.15,
         root=data_dir,
         loader=torch.load,
         extensions=".pt",
-        transform=None,  # already preprocessed
+        transform=None, 
     )
     n_total  = len(full_dataset)
     n_val    = max(1, int(n_total * val_split))
