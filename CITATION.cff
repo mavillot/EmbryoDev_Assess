@@ -4,6 +4,6 @@ message: "If you use this repository, please cite it using the metadata below."
 type: software
 authors:
   - family-names: "Villota"
-    given-names: "Miguel"
+    given-names: "María"
 repository-code: "https://github.com/mavillot/EmbryoDev_Assess"
 license: MIT
